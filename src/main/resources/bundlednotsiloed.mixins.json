@@ -1,0 +1,22 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.cappleapple.bundlednotsiloed.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "AbstractContainerMenuMixin",
+    "AbstractContainerMenuAccessor",
+    "InventoryMixin",
+    "InventoryMenuMixin",
+    "ItemEntityMixin",
+    "PlayerMixin",
+    "SlotMixin"
+  ],
+  "client": [
+    "GuiMixin",
+    "MouseHandlerMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -1,0 +1,133 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.143'
+    id 'idea'
+}
+
+tasks.named('wrapper', Wrapper).configure {
+    distributionType = Wrapper.DistributionType.BIN
+}
+
+version = mod_version
+group = mod_group_id
+
+sourceSets.main.resources {
+    srcDir('src/generated/resources')
+    exclude('**/*.bbmodel')
+    exclude('src/generated/**/.cache')
+}
+
+repositories {
+    maven { url = 'https://maven.blamejared.com' }
+    maven { url = 'https://maven.terraformersmc.com/releases' }
+}
+
+base {
+    archivesName = mod_id
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+neoForge {
+    version = project.neo_version
+
+    parchment {
+        mappingsVersion = project.parchment_mappings_version
+        minecraftVersion = project.parchment_minecraft_version
+    }
+
+    runs {
+        client {
+            client()
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+        server {
+            server()
+            programArgument '--nogui'
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+        gameTestServer {
+            type = 'gameTestServer'
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+        data {
+            data()
+            programArguments.addAll '--mod', project.mod_id, '--all', '--output', file('src/generated/resources/').getAbsolutePath(), '--existing', file('src/main/resources/').getAbsolutePath()
+        }
+        configureEach {
+            systemProperty 'forge.logging.markers', 'REGISTRIES'
+            logLevel = org.slf4j.event.Level.DEBUG
+        }
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet(sourceSets.main)
+        }
+    }
+
+    unitTest {
+        enable()
+        testedMod = mods."${mod_id}"
+    }
+}
+
+configurations {
+    runtimeClasspath.extendsFrom localRuntime
+}
+
+dependencies {
+    implementation "com.cappleapple:stacksnotslots:${stacks_not_slots_version}"
+    implementation "com.cappleapple:panelsnotscreens:${panels_not_screens_version}"
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    def localJei = fileTree('modstotestwith') { include 'jei-*.jar' }
+    def localEmi = fileTree('modstotestwith') { include 'emi-*.jar' }
+    def localSophisticated = fileTree('modstotestwith') { include 'sophisticated*.jar' }
+    def localMouseTweaks = fileTree('modstotestwith') { include 'MouseTweaks-*.jar' }
+    def localTomsStorage = fileTree('modstotestwith') { include 'toms_storage-*.jar' }
+    if (!localJei.files.isEmpty()) compileOnly files(localJei)
+    else compileOnly 'mezz.jei:jei-1.21.1-neoforge-api:19.42.0.379'
+    if (!localEmi.files.isEmpty()) compileOnly files(localEmi)
+    else compileOnly 'dev.emi:emi-neoforge:1.1.24+1.21.1'
+    if (!project.hasProperty('skipOptionalCompatRuntime')) {
+        localRuntime files(localJei, localEmi, localSophisticated, localMouseTweaks, localTomsStorage)
+    }
+}
+
+tasks.named('test', Test).configure {
+    useJUnitPlatform()
+}
+
+var generateModMetadata = tasks.register('generateModMetadata', ProcessResources) {
+    var replaceProperties = [
+            minecraft_version          : minecraft_version,
+            minecraft_version_range    : minecraft_version_range,
+            neo_version                : neo_version,
+            loader_version_range       : loader_version_range,
+            mod_id                     : mod_id,
+            mod_name                   : mod_name,
+            mod_license                : mod_license,
+            mod_version                : mod_version,
+            stacks_not_slots_version   : stacks_not_slots_version,
+            panels_not_screens_version : panels_not_screens_version,
+    ]
+    inputs.properties replaceProperties
+    expand replaceProperties
+    from 'src/main/templates'
+    into 'build/generated/sources/modMetadata'
+}
+sourceSets.main.resources.srcDir generateModMetadata
+neoForge.ideSyncTask generateModMetadata
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.compilerArgs.add('-Xlint:deprecation')
+}
+
+idea {
+    module {
+        downloadSources = true
+        downloadJavadoc = true
+    }
+}

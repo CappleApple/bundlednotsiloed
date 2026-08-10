@@ -1,0 +1,23 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+    }
+}
+
+plugins {
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
+}
+
+includeBuild('../stacks-not-slots') {
+    dependencySubstitution {
+        substitute module('com.cappleapple:stacksnotslots') using project(':')
+    }
+}
+
+includeBuild('../panels-not-screens') {
+    dependencySubstitution {
+        substitute module('com.cappleapple:panelsnotscreens') using project(':')
+    }
+}
+
+rootProject.name = 'bundled-not-siloed'
