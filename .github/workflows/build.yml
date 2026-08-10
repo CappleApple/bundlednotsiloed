@@ -6,11 +6,24 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout Bundled Not Siloed
         uses: actions/checkout@v4
         with:
+          path: bundled-not-siloed
           fetch-depth: 0
           fetch-tags: true
+
+      - name: Checkout Stacks Not Slots
+        uses: actions/checkout@v4
+        with:
+          repository: CappleApple/stacksnotslots
+          path: stacks-not-slots
+
+      - name: Checkout Panels Not Screens
+        uses: actions/checkout@v4
+        with:
+          repository: CappleApple/panelsnotscreens
+          path: panels-not-screens
 
       - name: Setup JDK 21
         uses: actions/setup-java@v4
@@ -22,4 +35,5 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build with Gradle
-        run: ./gradlew build
+        working-directory: bundled-not-siloed
+        run: ./gradlew build -PskipOptionalCompatRuntime
