@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0 - 2026-08-10
+
+- Promoted the integrated player-facing mod and its API dependencies to version 1.0 with no functional changes.
+
 ## 0.6.5 - 2026-08-10
 
 ### Changed
