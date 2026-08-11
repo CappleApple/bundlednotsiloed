@@ -19,7 +19,7 @@ class WorldPickupInsertionTest {
         DynamicCapacityInventory inventory = inventory();
         inventory.replaceSyntheticSlot(9, new ItemStack(Items.STONE));
 
-        WorldPickupInsertion.insert(inventory, new ItemStack(Items.DIRT), true, false);
+        WorldPickupInsertion.insert(inventory, new ItemStack(Items.DIRT), NewItemDestination.INVENTORY_FIRST, false);
 
         assertEquals(Items.DIRT, inventory.syntheticStack(10).getItem());
         assertTrue(inventory.syntheticStack(0).isEmpty());
@@ -30,7 +30,7 @@ class WorldPickupInsertionTest {
         DynamicCapacityInventory inventory = inventory();
         inventory.replaceSyntheticSlot(36, new ItemStack(Items.DIRT, 10));
 
-        WorldPickupInsertion.insert(inventory, new ItemStack(Items.DIRT, 3), true, false);
+        WorldPickupInsertion.insert(inventory, new ItemStack(Items.DIRT, 3), NewItemDestination.HOTBAR_FIRST, false);
 
         assertEquals(13, inventory.syntheticStack(36).getCount());
         assertTrue(inventory.syntheticStack(9).isEmpty());
@@ -41,7 +41,7 @@ class WorldPickupInsertionTest {
         DynamicCapacityInventory inventory = inventory();
         inventory.replaceSyntheticSlot(0, new ItemStack(Items.DIRT, 63));
 
-        WorldPickupInsertion.insert(inventory, new ItemStack(Items.DIRT, 3), true, false);
+        WorldPickupInsertion.insert(inventory, new ItemStack(Items.DIRT, 3), NewItemDestination.STOWED_FIRST, false);
 
         assertEquals(64, inventory.syntheticStack(0).getCount());
         assertEquals(2, inventory.syntheticStack(36).getCount());
@@ -49,13 +49,34 @@ class WorldPickupInsertionTest {
     }
 
     @Test
-    void hotbarIsOnlyUsedForNewIdentityAfterTheMainGridIsFull() {
+    void inventoryFirstUsesHotbarOnlyAfterTheMainGridIsFull() {
         DynamicCapacityInventory inventory = inventory();
         for (int slot = 9; slot < 36; slot++) inventory.replaceSyntheticSlot(slot, new ItemStack(Items.STONE));
 
-        WorldPickupInsertion.insert(inventory, new ItemStack(Items.DIRT), true, false);
+        WorldPickupInsertion.insert(inventory, new ItemStack(Items.DIRT), NewItemDestination.INVENTORY_FIRST, false);
 
         assertEquals(Items.DIRT, inventory.syntheticStack(0).getItem());
+    }
+
+    @Test
+    void hotbarFirstUsesTheFirstEmptyHotbarSlot() {
+        DynamicCapacityInventory inventory = inventory();
+
+        WorldPickupInsertion.insert(inventory, new ItemStack(Items.DIRT), NewItemDestination.HOTBAR_FIRST, false);
+
+        assertEquals(Items.DIRT, inventory.syntheticStack(0).getItem());
+        assertTrue(inventory.syntheticStack(9).isEmpty());
+    }
+
+    @Test
+    void stowedFirstBypassesEmptyVisibleSlots() {
+        DynamicCapacityInventory inventory = inventory();
+
+        WorldPickupInsertion.insert(inventory, new ItemStack(Items.DIRT), NewItemDestination.STOWED_FIRST, false);
+
+        assertEquals(Items.DIRT, inventory.syntheticStack(36).getItem());
+        assertTrue(inventory.syntheticStack(0).isEmpty());
+        assertTrue(inventory.syntheticStack(9).isEmpty());
     }
 
     private static DynamicCapacityInventory inventory() {

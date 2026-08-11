@@ -31,7 +31,7 @@ public final class InventoryTransactions {
 
         ItemStack limitedStack = allowed == stack.getCount() ? stack : stack.copyWithCount(allowed);
         InsertionResult limitedProposal = context == InsertionContext.WORLD_PICKUP
-                ? WorldPickupInsertion.insert(inventory, limitedStack, data.pickupIntoHotbar(), true)
+                ? WorldPickupInsertion.insert(inventory, limitedStack, data.newItemDestination(), true)
                 : inventory.insertAtOrAfter(limitedStack, 0, true);
         InsertionResult proposed = allowed == stack.getCount() ? limitedProposal : new InsertionResult(
                 stack.getCount(), limitedProposal.acceptedAmount(),
@@ -46,7 +46,7 @@ public final class InventoryTransactions {
         }
         if (simulate) return proposed;
         InsertionResult committed = context == InsertionContext.WORLD_PICKUP
-                ? WorldPickupInsertion.insert(inventory, limitedStack, data.pickupIntoHotbar(), false)
+                ? WorldPickupInsertion.insert(inventory, limitedStack, data.newItemDestination(), false)
                 : inventory.insertAtOrAfter(limitedStack, 0, false);
         if (allowed == stack.getCount()) return committed;
         int accepted = committed.acceptedAmount();

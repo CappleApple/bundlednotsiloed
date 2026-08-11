@@ -3,9 +3,11 @@ package com.cappleapple.bundlednotsiloed.data;
 import com.cappleapple.bundlednotsiloed.attribute.ModAttributes;
 import com.cappleapple.bundlednotsiloed.category.PlayerCategoryData;
 import com.cappleapple.bundlednotsiloed.category.SortMode;
+import com.cappleapple.bundlednotsiloed.inventory.NewItemDestination;
 import com.cappleapple.stacksnotslots.api.compat.VanillaInventoryMirror;
 import com.cappleapple.bundlednotsiloed.hotbar.HotbarBindings;
 import com.cappleapple.stacksnotslots.api.inventory.DynamicCapacityInventory;
+import java.util.Objects;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.entity.player.Player;
@@ -22,7 +24,7 @@ public final class PlayerInventoryData implements INBTSerializable<CompoundTag> 
     private boolean initializedCapacityBase;
     private SortMode inventorySortPreference = SortMode.NAME_ASCENDING;
     private ResourceLocation selectedCategoryPreference;
-    private boolean pickupIntoHotbar = true;
+    private NewItemDestination newItemDestination = NewItemDestination.INVENTORY_FIRST;
     private boolean autoRefill = true;
 
     public PlayerInventoryData(Player owner) {
@@ -44,8 +46,8 @@ public final class PlayerInventoryData implements INBTSerializable<CompoundTag> 
     public void setInventorySortPreference(SortMode preference) { inventorySortPreference = preference; }
     public @Nullable ResourceLocation selectedCategoryPreference() { return selectedCategoryPreference; }
     public void setSelectedCategoryPreference(@Nullable ResourceLocation preference) { selectedCategoryPreference = preference; }
-    public boolean pickupIntoHotbar() { return pickupIntoHotbar; }
-    public void setPickupIntoHotbar(boolean value) { pickupIntoHotbar = value; }
+    public NewItemDestination newItemDestination() { return newItemDestination; }
+    public void setNewItemDestination(NewItemDestination value) { newItemDestination = Objects.requireNonNull(value); }
     public boolean autoRefill() { return autoRefill; }
     public void setAutoRefill(boolean value) { autoRefill = value; }
 
@@ -56,7 +58,7 @@ public final class PlayerInventoryData implements INBTSerializable<CompoundTag> 
         root.put("Hotbar", hotbar.saveClientState(provider));
         root.putString("InventorySortPreference", inventorySortPreference.name());
         if (selectedCategoryPreference != null) root.putString("SelectedCategoryPreference", selectedCategoryPreference.toString());
-        root.putBoolean("PickupIntoHotbar", pickupIntoHotbar);
+        root.putString("NewItemDestination", newItemDestination.name());
         root.putBoolean("AutoRefill", autoRefill);
         return root;
     }
@@ -125,7 +127,13 @@ public final class PlayerInventoryData implements INBTSerializable<CompoundTag> 
             inventorySortPreference = SortMode.NAME_ASCENDING;
         }
         selectedCategoryPreference = ResourceLocation.tryParse(root.getString("SelectedCategoryPreference"));
-        pickupIntoHotbar = !root.contains("PickupIntoHotbar") || root.getBoolean("PickupIntoHotbar");
+        try {
+            newItemDestination = NewItemDestination.valueOf(root.getString("NewItemDestination"));
+        } catch (IllegalArgumentException ignored) {
+            // 1.1 and older stored a boolean with no exact three-way equivalent. Preserve the
+            // behavior those players were seeing at upgrade time.
+            newItemDestination = NewItemDestination.INVENTORY_FIRST;
+        }
         autoRefill = !root.contains("AutoRefill") || root.getBoolean("AutoRefill");
     }
 }

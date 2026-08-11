@@ -16,6 +16,7 @@ import com.cappleapple.bundlednotsiloed.network.BrowserTransferPayload;
 import com.cappleapple.bundlednotsiloed.network.BulkTransferPayload;
 import com.cappleapple.bundlednotsiloed.network.InventoryActionPayload;
 import com.cappleapple.bundlednotsiloed.network.InventoryViewPreferencesPayload;
+import com.cappleapple.bundlednotsiloed.network.StowMainGridPayload;
 import com.cappleapple.bundlednotsiloed.network.StowSlotPayload;
 import com.cappleapple.panelsnotscreens.api.panel.DockSide;
 import com.cappleapple.panelsnotscreens.api.panel.Panel;
@@ -103,7 +104,12 @@ public final class ContainerInventoryOverlay {
     private static int suppressedTypedKey = GLFW.GLFW_KEY_UNKNOWN;
     private static int consumedReleaseButton = -1;
     private static Screen capturedPressScreen;
+    private static Screen stowHandlePressScreen;
+    private static int stowHandleReleaseButton = -1;
     private static int scroll;
+    private static boolean categoryGridOpen;
+    private static int categoryGridScroll;
+    private static CategoryDefinition handleCategoryPreview;
     private static UUID cachedPlayer;
     private static long cachedRevision = -1;
     private static String cachedQuery = "";
@@ -141,6 +147,10 @@ public final class ContainerInventoryOverlay {
         double mouseY = scaledMouseY(minecraft);
         preparePanel(screen);
         if (action == GLFW.GLFW_RELEASE) {
+            if (button == stowHandleReleaseButton && screen == stowHandlePressScreen) {
+                clearStowHandleCapture();
+                return true;
+            }
             boolean wasOpen = open;
             boolean consumed = PANEL.mouseReleased(screen, mouseX, mouseY, button);
             syncFieldsFromPanel();
@@ -156,6 +166,18 @@ public final class ContainerInventoryOverlay {
             clearPointerCapture();
             PANEL.cancelPointerCapture();
         }
+        if (stowHandleReleaseButton != -1) clearStowHandleCapture();
+        if (inside(mouseX, mouseY, handleX, handleY,
+                BrowserPanelLayout.HANDLE_WIDTH, BrowserPanelLayout.HANDLE_HEIGHT)) {
+            handleCategoryPreview = null;
+            categoryGridOpen = false;
+            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && Screen.hasShiftDown()) {
+                stowHandlePressScreen = screen;
+                stowHandleReleaseButton = button;
+                PacketDistributor.sendToServer(new StowMainGridPayload());
+                return true;
+            }
+        }
         boolean consumed = PANEL.mouseClicked(screen, mouseX, mouseY, button);
         syncFieldsFromPanel();
         return consumed;
@@ -166,7 +188,16 @@ public final class ContainerInventoryOverlay {
         Minecraft minecraft = Minecraft.getInstance();
         if (!supports(minecraft.screen)) return false;
         preparePanel(minecraft.screen);
-        return PANEL.mouseScrolled(minecraft.screen, scaledMouseX(minecraft), scaledMouseY(minecraft), deltaY);
+        double mouseX = scaledMouseX(minecraft);
+        double mouseY = scaledMouseY(minecraft);
+        if (visible && inside(mouseX, mouseY, handleX, handleY,
+                BrowserPanelLayout.HANDLE_WIDTH, BrowserPanelLayout.HANDLE_HEIGHT)) {
+            if (!Screen.hasShiftDown() && deltaY != 0) {
+                handleCategoryPreview = changeCategory(deltaY > 0 ? -1 : 1);
+            }
+            return true;
+        }
+        return PANEL.mouseScrolled(minecraft.screen, mouseX, mouseY, deltaY);
     }
 
     public static void render(ScreenEvent.Render.Post event) {
@@ -202,6 +233,8 @@ public final class ContainerInventoryOverlay {
         if (!supports(event.getScreen())) return;
         InputConstants.Key pressedKey = InputConstants.getKey(event.getKeyCode(), event.getScanCode());
         if (ClientKeyMappings.TOGGLE_BROWSER.isActiveAndMatches(pressedKey)) {
+            categoryGridOpen = false;
+            handleCategoryPreview = null;
             if (open) {
                 setOpen(false, event.getScreen());
                 visible = false;
@@ -213,6 +246,12 @@ public final class ContainerInventoryOverlay {
             clearPointerCapture();
             searchFocused = false;
             SEARCH.clearSelection();
+            event.setCanceled(true);
+            return;
+        }
+        if (open && categoryGridOpen && event.getKeyCode() == GLFW.GLFW_KEY_ESCAPE) {
+            categoryGridOpen = false;
+            categoryGridScroll = 0;
             event.setCanceled(true);
             return;
         }
@@ -305,14 +344,15 @@ public final class ContainerInventoryOverlay {
         searchFocused = false;
         SEARCH.clearSelection();
         if (layout.category().contains(mouseX, mouseY)) {
-            changeCategory(button == 1 ? -1 : 1);
+            categoryGridOpen = !categoryGridOpen;
+            categoryGridScroll = 0;
             return true;
         }
         if (layout.sort().contains(mouseX, mouseY)) {
             cycleSort();
             return true;
         }
-        if (layout.transfer().contains(mouseX, mouseY)) {
+        if (showsOpenContainerTransfer(screen) && layout.transfer().contains(mouseX, mouseY)) {
             PacketDistributor.sendToServer(new BulkTransferPayload(Screen.hasShiftDown()
                     ? BulkTransferPayload.Direction.TO_CONTAINER : BulkTransferPayload.Direction.FROM_CONTAINER,
                     BulkTransferPayload.Target.OPEN_MENU));
@@ -328,6 +368,19 @@ public final class ContainerInventoryOverlay {
         }
         if (layout.settings().contains(mouseX, mouseY)) {
             Minecraft.getInstance().setScreen(new InventoryBrowserSettingsScreen(screen));
+            return true;
+        }
+
+        if (categoryGridOpen && inside(mouseX, mouseY, layout.contentX(), layout.contentY(),
+                layout.contentWidth(), layout.contentHeight())) {
+            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+                CategoryDefinition selected = categoryGridEntryAt(layout, mouseX, mouseY);
+                if (selected != null) {
+                    selectCategory(selected);
+                    categoryGridOpen = false;
+                    categoryGridScroll = 0;
+                }
+            }
             return true;
         }
 
@@ -353,6 +406,14 @@ public final class ContainerInventoryOverlay {
         BrowserPanelLayout layout = layout(screen);
         if (layout.category().contains(mouseX, mouseY)) {
             changeCategory(deltaY > 0 ? -1 : 1);
+            categoryGridOpen = false;
+            categoryGridScroll = 0;
+            return true;
+        }
+        if (categoryGridOpen && inside(mouseX, mouseY, layout.contentX(), layout.contentY(),
+                layout.contentWidth(), layout.contentHeight())) {
+            CategoryGridLayout grid = categoryGridLayout(layout);
+            categoryGridScroll = clamp(categoryGridScroll - (int)Math.signum(deltaY), 0, grid.maximumScrollRow());
             return true;
         }
         if (!inside(mouseX, mouseY, layout.contentX(), layout.contentY(), layout.contentWidth(), layout.contentHeight())) return false;
@@ -398,12 +459,15 @@ public final class ContainerInventoryOverlay {
                 "gui.bundlednotsiloed.category_control");
         renderTextSquare(graphics, layout.sort(), shortSortName(currentSort()), mouseX, mouseY,
                 "gui.bundlednotsiloed.sort_control");
-        renderSquare(graphics, layout.transfer(),
-                new ItemStack(Screen.hasShiftDown() ? Items.PISTON : Items.STICKY_PISTON), mouseX, mouseY,
-                Screen.hasShiftDown() ? "gui.bundlednotsiloed.dump_to_container" : "gui.bundlednotsiloed.extract_from_container");
+        if (showsOpenContainerTransfer(screen)) {
+            renderSquare(graphics, layout.transfer(),
+                    new ItemStack(Screen.hasShiftDown() ? Items.PISTON : Items.STICKY_PISTON), mouseX, mouseY,
+                    Screen.hasShiftDown() ? "gui.bundlednotsiloed.dump_to_container" : "gui.bundlednotsiloed.extract_from_container");
+        }
         if (layout.category().contains(mouseX, mouseY)) hoveredCategory = currentCategory();
 
-        if (ClientConfig.BROWSER_VIEW_MODE.get() == ClientConfig.BrowserViewMode.GRID) renderGrid(graphics, layout, entries, mouseX, mouseY);
+        if (categoryGridOpen) renderCategoryGrid(graphics, layout, mouseX, mouseY);
+        else if (ClientConfig.BROWSER_VIEW_MODE.get() == ClientConfig.BrowserViewMode.GRID) renderGrid(graphics, layout, entries, mouseX, mouseY);
         else renderList(graphics, layout, entries, mouseX, mouseY);
 
         CapacityAmount used = inventory.exactUsedCapacity();
@@ -471,11 +535,40 @@ public final class ContainerInventoryOverlay {
         }
     }
 
+    private static void renderCategoryGrid(GuiGraphics graphics, BrowserPanelLayout layout, int mouseX, int mouseY) {
+        List<CategoryDefinition> categories = enabledCategories();
+        CategoryGridLayout grid = categoryGridLayout(layout);
+        categoryGridScroll = grid.scrollRow();
+        ResourceLocation selectedId = Minecraft.getInstance().player.getData(ModAttachments.PLAYER_DATA)
+                .selectedCategoryPreference();
+        for (int offset = 0; offset < grid.visibleCount(); offset++) {
+            int index = grid.firstIndex() + offset;
+            if (index >= categories.size()) break;
+            CategoryDefinition category = categories.get(index);
+            int x = layout.contentX() + offset % grid.columns() * BrowserPanelLayout.GRID_CELL;
+            int y = layout.contentY() + offset / grid.columns() * BrowserPanelLayout.GRID_CELL;
+            boolean hovered = inside(mouseX, mouseY, x, y, BrowserPanelLayout.GRID_CELL, BrowserPanelLayout.GRID_CELL);
+            boolean selected = category.id().equals(selectedId);
+            if (hovered || selected) {
+                graphics.fill(x, y, x + BrowserPanelLayout.GRID_CELL, y + BrowserPanelLayout.GRID_CELL,
+                        hovered ? 0xCC4F72A5 : 0x99356DA5);
+            }
+            graphics.renderItem(CategoryIcons.displayStack(category), x + 2, y + 2);
+            if (hovered) hoveredCategory = category;
+        }
+    }
+
     private static void renderHandleDecoration(GuiGraphics graphics, int mouseX, int mouseY) {
         boolean hovered = inside(mouseX, mouseY, handleX, handleY,
                 BrowserPanelLayout.HANDLE_WIDTH, BrowserPanelLayout.HANDLE_HEIGHT);
+        if (!hovered) handleCategoryPreview = null;
+        boolean stowMode = Screen.hasShiftDown();
         String configuredHandleIcon = ClientConfig.BROWSER_HANDLE_ICON.get();
-        if (BUILT_IN_LOGO_ICON.equals(configuredHandleIcon)) {
+        if (stowMode) {
+            graphics.renderItem(new ItemStack(Items.STICKY_PISTON), handleX + 2, handleY + 1);
+        } else if (handleCategoryPreview != null) {
+            graphics.renderItem(CategoryIcons.displayStack(handleCategoryPreview), handleX + 2, handleY + 1);
+        } else if (BUILT_IN_LOGO_ICON.equals(configuredHandleIcon)) {
             graphics.blit(LOGO_TEXTURE, handleX + 2, handleY + 1, 16, 16,
                     0, 0, 256, 256, 256, 256);
         } else {
@@ -488,8 +581,11 @@ public final class ContainerInventoryOverlay {
                     handleX + BrowserPanelLayout.HANDLE_WIDTH / 2, handleY + 5, 0xFFFFFF);
             graphics.pose().popPose();
         }
-        if (hovered) hoveredControl = Screen.hasShiftDown()
-                ? "gui.bundlednotsiloed.inventory_browser_drag" : "gui.bundlednotsiloed.inventory_browser";
+        if (hovered) {
+            if (stowMode) hoveredControl = "gui.bundlednotsiloed.stow_main_grid";
+            else if (handleCategoryPreview != null) hoveredCategory = handleCategoryPreview;
+            else hoveredControl = "gui.bundlednotsiloed.inventory_browser";
+        }
     }
 
     private static void renderSquare(GuiGraphics graphics, BrowserPanelLayout.ButtonBounds bounds,
@@ -581,27 +677,55 @@ public final class ContainerInventoryOverlay {
         var data = player.getData(ModAttachments.PLAYER_DATA);
         CategoryDefinition selected = data.selectedCategoryPreference() == null ? null : data.categories().find(data.selectedCategoryPreference());
         if (selected != null && selected.enabled()) return selected;
-        return data.categories().categories().stream().filter(CategoryDefinition::enabled).findFirst().orElse(null);
+        return enabledCategories().stream().findFirst().orElse(null);
     }
 
     private static SortMode currentSort() {
         return Minecraft.getInstance().player.getData(ModAttachments.PLAYER_DATA).inventorySortPreference();
     }
 
-    private static void changeCategory(int direction) {
-        var data = Minecraft.getInstance().player.getData(ModAttachments.PLAYER_DATA);
-        List<CategoryDefinition> categories = data.categories().categories().stream().filter(CategoryDefinition::enabled).toList();
-        if (categories.isEmpty()) return;
+    private static List<CategoryDefinition> enabledCategories() {
+        var player = Minecraft.getInstance().player;
+        if (player == null) return List.of();
+        return player.getData(ModAttachments.PLAYER_DATA).categories().categories().stream()
+                .filter(CategoryDefinition::enabled).toList();
+    }
+
+    private static CategoryDefinition changeCategory(int direction) {
+        List<CategoryDefinition> categories = enabledCategories();
+        if (categories.isEmpty()) return null;
         int current = 0;
-        if (data.selectedCategoryPreference() != null) {
-            for (int index = 0; index < categories.size(); index++) if (categories.get(index).id().equals(data.selectedCategoryPreference())) current = index;
+        CategoryDefinition selected = currentCategory();
+        if (selected != null) {
+            for (int index = 0; index < categories.size(); index++) {
+                if (categories.get(index).id().equals(selected.id())) current = index;
+            }
         }
         CategoryDefinition category = categories.get(Math.floorMod(current + direction, categories.size()));
+        selectCategory(category);
+        return category;
+    }
+
+    private static void selectCategory(CategoryDefinition category) {
+        var data = Minecraft.getInstance().player.getData(ModAttachments.PLAYER_DATA);
         data.setSelectedCategoryPreference(category.id());
         data.setInventorySortPreference(category.sortMode());
         PacketDistributor.sendToServer(new InventoryViewPreferencesPayload(category.sortMode(), category.id()));
         scroll = 0;
         invalidateEntries();
+    }
+
+    private static CategoryGridLayout categoryGridLayout(BrowserPanelLayout layout) {
+        return CategoryGridLayout.calculate(layout.contentWidth(), layout.contentHeight(),
+                enabledCategories().size(), categoryGridScroll);
+    }
+
+    private static CategoryDefinition categoryGridEntryAt(BrowserPanelLayout layout, double mouseX, double mouseY) {
+        List<CategoryDefinition> categories = enabledCategories();
+        CategoryGridLayout grid = CategoryGridLayout.calculate(layout.contentWidth(), layout.contentHeight(),
+                categories.size(), categoryGridScroll);
+        int index = grid.indexAt(mouseX - layout.contentX(), mouseY - layout.contentY());
+        return index >= 0 && index < categories.size() ? categories.get(index) : null;
     }
 
     private static void cycleSort() {
@@ -624,6 +748,10 @@ public final class ContainerInventoryOverlay {
 
     private static void setOpen(boolean value, Screen screen) {
         open = value;
+        if (!value) {
+            categoryGridOpen = false;
+            categoryGridScroll = 0;
+        }
         PANEL.setExpanded(value);
         PacketDistributor.sendToServer(new BrowserStatePayload(value));
         persistScreenState(screen);
@@ -633,6 +761,8 @@ public final class ContainerInventoryOverlay {
         visible = true;
         PANEL.show();
         searchFocused = true;
+        categoryGridOpen = false;
+        categoryGridScroll = 0;
         scroll = 0;
         updateSearch(SEARCH.clear());
         clearPointerCapture();
@@ -657,6 +787,11 @@ public final class ContainerInventoryOverlay {
         capturedPressScreen = null;
         consumedReleaseButton = -1;
         PANEL.cancelPointerCapture();
+    }
+
+    private static void clearStowHandleCapture() {
+        stowHandlePressScreen = null;
+        stowHandleReleaseButton = -1;
     }
 
     private static double scaledMouseX(Minecraft minecraft) {
@@ -704,6 +839,11 @@ public final class ContainerInventoryOverlay {
         };
     }
 
+    private static boolean showsOpenContainerTransfer(AbstractContainerScreen<?> screen) {
+        var player = Minecraft.getInstance().player;
+        return player != null && screen.getMenu() != player.inventoryMenu;
+    }
+
     private static BrowserPanelLayout layout(AbstractContainerScreen<?> screen) {
         return BrowserPanelLayout.calculate(screen.width, screen.height, handleX, handleY, dockSide,
                 ClientConfig.BROWSER_VIEW_MODE.get(), ClientConfig.BROWSER_GRID_COLUMNS.getAsInt(),
@@ -716,6 +856,7 @@ public final class ContainerInventoryOverlay {
         int guiTop = container.getGuiTop();
         if (lastScreen != screen) {
             clearPointerCapture();
+            clearStowHandleCapture();
             lastScreen = screen;
             activeScreenType = screenStateKey(container);
             BrowserScreenStateStore.State state = BrowserScreenStateStore.load(activeScreenType);
@@ -725,6 +866,9 @@ public final class ContainerInventoryOverlay {
             visible = state.visible();
             dockSide = state.dockSide();
             searchFocused = false;
+            categoryGridOpen = false;
+            categoryGridScroll = 0;
+            handleCategoryPreview = null;
             SEARCH.clearSelection();
             if (state.hasPosition()) {
                 handleX = guiLeft + state.offsetX();

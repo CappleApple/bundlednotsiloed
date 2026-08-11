@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.2 - 2026-08-11
+
+### Added
+
+- Added a browser-settings option for routing brand-new item types to the hotbar first, the simulated 27-slot main inventory first, or stowed storage first. Existing matching visible and stowed stacks still take priority.
+- Clicking the browser panel's category control now opens a scrollable grid of category icons with name tooltips and direct selection.
+
+### Changed
+
+- Scrolling over the browser handle now switches categories whether the panel is open or closed and temporarily previews the selected category icon and name.
+- Holding Shift changes the browser handle into a `Stow All` sticky-piston action.
+- The open-container bulk-transfer control is now hidden in the player's own inventory and remains available in container interfaces.
+- Removed the separate floating inventory category and `Stow All` selector; its functionality now lives on the browser handle and panel.
+
 ## 1.1 - 2026-08-11
 
 ### Added

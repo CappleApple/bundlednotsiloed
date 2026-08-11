@@ -3,7 +3,9 @@ package com.cappleapple.bundlednotsiloed.client.screen;
 import com.cappleapple.bundlednotsiloed.client.ClientSaveState;
 import com.cappleapple.bundlednotsiloed.config.ClientConfig;
 import com.cappleapple.bundlednotsiloed.data.ModAttachments;
+import com.cappleapple.bundlednotsiloed.inventory.NewItemDestination;
 import com.cappleapple.bundlednotsiloed.network.AutoRefillPayload;
+import com.cappleapple.bundlednotsiloed.network.NewItemDestinationPayload;
 import java.util.Locale;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -22,12 +24,14 @@ public final class InventoryBrowserSettingsScreen extends Screen {
     private boolean autoSide = ClientConfig.AUTO_BROWSER_DOCK_SIDE.getAsBoolean();
     private boolean transferOverlay = ClientConfig.BULK_TRANSFER_OVERLAY.getAsBoolean();
     private boolean autoRefill;
+    private NewItemDestination newItemDestination = NewItemDestination.INVENTORY_FIRST;
     private Button viewButton;
     private Button itemCountButton;
     private Button overallCountButton;
     private Button autoSideButton;
     private Button transferOverlayButton;
     private Button autoRefillButton;
+    private Button newItemDestinationButton;
     private Button defaultPlacementButton;
     private EditBox columns;
     private EditBox rows;
@@ -48,6 +52,9 @@ public final class InventoryBrowserSettingsScreen extends Screen {
         int left = width / 2 - 160;
         autoRefill = minecraft.player == null
                 || minecraft.player.getData(ModAttachments.PLAYER_DATA).autoRefill();
+        if (minecraft.player != null) {
+            newItemDestination = minecraft.player.getData(ModAttachments.PLAYER_DATA).newItemDestination();
+        }
         viewButton = button(left, 28, 158, ignored -> {
             viewMode = next(viewMode);
             updateButtons();
@@ -93,8 +100,12 @@ public final class InventoryBrowserSettingsScreen extends Screen {
         }, "tooltip.bundlednotsiloed.default_browser_placement");
         manageIcon = field(left + 162, 160, 158, ClientConfig.MANAGE_TABS_ICON.get(),
                 "gui.bundlednotsiloed.manage_icon", "tooltip.bundlednotsiloed.configurable_icon");
-        settingsIcon = field(left, 182, 320, ClientConfig.SETTINGS_ICON.get(),
+        settingsIcon = field(left, 182, 158, ClientConfig.SETTINGS_ICON.get(),
                 "gui.bundlednotsiloed.settings_icon", "tooltip.bundlednotsiloed.configurable_icon");
+        newItemDestinationButton = button(left + 162, 182, 158, ignored -> {
+            newItemDestination = next(newItemDestination);
+            updateButtons();
+        }, "tooltip.bundlednotsiloed.new_item_destination");
         addRenderableWidget(Button.builder(Component.translatable("gui.done"), ignored -> saveAndClose())
                 .bounds(left, Math.max(206, height - 24), 320, 20).build());
         updateButtons();
@@ -122,6 +133,8 @@ public final class InventoryBrowserSettingsScreen extends Screen {
         overallCountButton.setMessage(Component.translatable("gui.bundlednotsiloed.overall_count_mode", display(overallCountMode)));
         transferOverlayButton.setMessage(Component.translatable("gui.bundlednotsiloed.bulk_overlay", onOff(transferOverlay)));
         autoRefillButton.setMessage(Component.translatable("gui.bundlednotsiloed.auto_refill", onOff(autoRefill)));
+        newItemDestinationButton.setMessage(Component.translatable(
+                "gui.bundlednotsiloed.new_item_destination", display(newItemDestination)));
         defaultPlacementButton.setMessage(Component.translatable(
                 "gui.bundlednotsiloed.default_browser_placement", display(defaultPlacement)));
     }
@@ -150,8 +163,11 @@ public final class InventoryBrowserSettingsScreen extends Screen {
         ClientConfig.MANAGE_TABS_ICON.set(manageIcon.getValue().trim());
         ClientConfig.SETTINGS_ICON.set(settingsIcon.getValue().trim());
         if (minecraft.player != null) {
-            minecraft.player.getData(ModAttachments.PLAYER_DATA).setAutoRefill(autoRefill);
+            var data = minecraft.player.getData(ModAttachments.PLAYER_DATA);
+            data.setAutoRefill(autoRefill);
+            data.setNewItemDestination(newItemDestination);
             PacketDistributor.sendToServer(new AutoRefillPayload(autoRefill));
+            PacketDistributor.sendToServer(new NewItemDestinationPayload(newItemDestination));
         }
         ClientSaveState.saveClientSettings();
         onClose();

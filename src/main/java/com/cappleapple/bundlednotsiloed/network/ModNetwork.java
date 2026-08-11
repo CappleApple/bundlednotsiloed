@@ -59,7 +59,7 @@ public final class ModNetwork {
     private ModNetwork() {}
 
     public static void registerPayloads(RegisterPayloadHandlersEvent event) {
-        var registrar = event.registrar("8");
+        var registrar = event.registrar("9");
         registrar.playToClient(InventorySnapshotPayload.TYPE, InventorySnapshotPayload.STREAM_CODEC, ModNetwork::receiveSnapshot);
         registrar.playToClient(InventoryDeltaPayload.TYPE, InventoryDeltaPayload.STREAM_CODEC, ModNetwork::receiveDelta);
         registrar.playToClient(PlayerMetadataPayload.TYPE, PlayerMetadataPayload.STREAM_CODEC, ModNetwork::receiveMetadata);
@@ -73,7 +73,7 @@ public final class ModNetwork {
         registrar.playToServer(InventoryViewPreferencesPayload.TYPE, InventoryViewPreferencesPayload.STREAM_CODEC, ModNetwork::updateViewPreferences);
         registrar.playToServer(StowSlotPayload.TYPE, StowSlotPayload.STREAM_CODEC, ModNetwork::stowSlot);
         registrar.playToServer(StowMainGridPayload.TYPE, StowMainGridPayload.STREAM_CODEC, ModNetwork::stowMainGrid);
-        registrar.playToServer(PickupToHotbarPayload.TYPE, PickupToHotbarPayload.STREAM_CODEC, ModNetwork::updatePickupToHotbar);
+        registrar.playToServer(NewItemDestinationPayload.TYPE, NewItemDestinationPayload.STREAM_CODEC, ModNetwork::updateNewItemDestination);
         registrar.playToServer(AutoRefillPayload.TYPE, AutoRefillPayload.STREAM_CODEC, ModNetwork::updateAutoRefill);
         registrar.playToServer(RecipeTransferPayload.TYPE, RecipeTransferPayload.STREAM_CODEC, ModNetwork::transferRecipe);
         registrar.playToServer(BrowserTransferPayload.TYPE, BrowserTransferPayload.STREAM_CODEC, ModNetwork::transferBrowserEntry);
@@ -360,10 +360,10 @@ public final class ModNetwork {
         player.containerMenu.broadcastChanges();
     }
 
-    private static void updatePickupToHotbar(PickupToHotbarPayload payload, IPayloadContext context) {
+    private static void updateNewItemDestination(NewItemDestinationPayload payload, IPayloadContext context) {
         if (!(context.player() instanceof ServerPlayer player) || !allowAction(player)) return;
         PlayerInventoryData data = player.getData(ModAttachments.PLAYER_DATA);
-        data.setPickupIntoHotbar(payload.enabled());
+        data.setNewItemDestination(payload.destination());
         sendMetadata(player);
     }
 

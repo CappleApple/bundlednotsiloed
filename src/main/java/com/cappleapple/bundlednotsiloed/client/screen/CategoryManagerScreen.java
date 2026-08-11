@@ -7,7 +7,6 @@ import com.cappleapple.bundlednotsiloed.hotbar.BindingType;
 import com.cappleapple.bundlednotsiloed.hotbar.HotbarBinding;
 import com.cappleapple.bundlednotsiloed.network.CategoryEditPayload;
 import com.cappleapple.bundlednotsiloed.network.HotbarBindPayload;
-import com.cappleapple.bundlednotsiloed.network.PickupToHotbarPayload;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -71,11 +70,6 @@ public final class CategoryManagerScreen extends Screen {
         pickerY = height - 104;
         if (selectedHotbar >= 0) addBindingPicker(left, bindableCategories());
         addHotbarButtons(left, height - 80);
-
-        boolean pickupToHotbar = data().pickupIntoHotbar();
-        addRenderableWidget(Button.builder(Component.translatable(pickupToHotbar
-                        ? "gui.bundlednotsiloed.pickups_hotbar_on" : "gui.bundlednotsiloed.pickups_hotbar_off"),
-                button -> togglePickupToHotbar()).bounds(left, height - 55, 300, 20).build());
 
         addRenderableWidget(Button.builder(Component.translatable("gui.bundlednotsiloed.add_tab"), ignored ->
                         minecraft.setScreen(new CategoryEditorScreen(this, player, null)))
@@ -175,7 +169,7 @@ public final class CategoryManagerScreen extends Screen {
     }
 
     private int fingerprint() {
-        int hash = Boolean.hashCode(data().pickupIntoHotbar());
+        int hash = 1;
         for (CategoryDefinition category : categories()) hash = 31 * hash + category.hashCode();
         for (int slot = 0; slot < 9; slot++) hash = 31 * hash + data().hotbar().get(slot).hashCode();
         return hash;
@@ -189,13 +183,6 @@ public final class CategoryManagerScreen extends Screen {
         PacketDistributor.sendToServer(new HotbarBindPayload(selectedHotbar, binding.type(),
                 category == null ? HotbarBindPayload.EMPTY_TARGET : category.id()));
         selectedHotbar = -1;
-        rebuildButtons();
-    }
-
-    private void togglePickupToHotbar() {
-        boolean enabled = !data().pickupIntoHotbar();
-        data().setPickupIntoHotbar(enabled);
-        PacketDistributor.sendToServer(new PickupToHotbarPayload(enabled));
         rebuildButtons();
     }
 

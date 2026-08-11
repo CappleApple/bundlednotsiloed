@@ -8,6 +8,7 @@ import io.netty.buffer.Unpooled;
 import java.util.List;
 import java.util.UUID;
 import com.cappleapple.bundlednotsiloed.inventory.ContainerTransfers;
+import com.cappleapple.bundlednotsiloed.inventory.NewItemDestination;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -86,17 +87,19 @@ class InventoryPayloadCodecTest {
     }
 
     @Test
-    void stowAndPickupPreferencePayloadsRoundTrip() {
+    void stowAndInventoryPreferencePayloadsRoundTrip() {
         RegistryFriendlyByteBuf buffer = createBuffer();
         try {
             StowSlotPayload.STREAM_CODEC.encode(buffer, new StowSlotPayload(-1));
-            PickupToHotbarPayload.STREAM_CODEC.encode(buffer, new PickupToHotbarPayload(false));
+            NewItemDestinationPayload.STREAM_CODEC.encode(buffer,
+                    new NewItemDestinationPayload(NewItemDestination.STOWED_FIRST));
             AutoRefillPayload.STREAM_CODEC.encode(buffer, new AutoRefillPayload(true));
             ResourceLocation recipeId = ResourceLocation.fromNamespaceAndPath("minecraft", "wooden_pickaxe");
             RecipeTransferPayload.STREAM_CODEC.encode(buffer, new RecipeTransferPayload(recipeId, true));
             buffer.readerIndex(0);
             assertEquals(-1, StowSlotPayload.STREAM_CODEC.decode(buffer).slot());
-            assertTrue(!PickupToHotbarPayload.STREAM_CODEC.decode(buffer).enabled());
+            assertEquals(NewItemDestination.STOWED_FIRST,
+                    NewItemDestinationPayload.STREAM_CODEC.decode(buffer).destination());
             assertTrue(AutoRefillPayload.STREAM_CODEC.decode(buffer).enabled());
             RecipeTransferPayload transfer = RecipeTransferPayload.STREAM_CODEC.decode(buffer);
             assertEquals(recipeId, transfer.recipeId());

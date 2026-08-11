@@ -15,11 +15,11 @@ public final class WorldPickupInsertion {
 
     /**
      * Keeps an item's existing location stable. A visible matching identity is topped up before
-     * overflow is stowed; otherwise an existing stowed identity is joined. Brand-new identities
-     * enter the main grid left-to-right/top-to-bottom, then the optional hotbar, then the backend.
+     * overflow is stowed; otherwise an existing stowed identity is joined. Only brand-new
+     * identities use the configured destination order.
      */
     public static InsertionResult insert(
-            DynamicCapacityInventory inventory, ItemStack stack, boolean allowNewHotbarStack, boolean simulate
+            DynamicCapacityInventory inventory, ItemStack stack, NewItemDestination destination, boolean simulate
     ) {
         InsertionResult proposal = inventory.insert(stack, true);
         if (simulate || !proposal.acceptedAnything()) return proposal;
@@ -33,9 +33,17 @@ public final class WorldPickupInsertion {
             remaining = mergeRange(inventory, remaining, MAIN_GRID_START, BACKEND_START);
             remaining = mergeRange(inventory, remaining, HOTBAR_START, MAIN_GRID_START);
         } else if (!hasBackendIdentity) {
-            remaining = fillEmptyRange(inventory, remaining, MAIN_GRID_START, BACKEND_START);
-            if (allowNewHotbarStack) {
-                remaining = fillEmptyRange(inventory, remaining, HOTBAR_START, MAIN_GRID_START);
+            switch (destination) {
+                case HOTBAR_FIRST -> {
+                    remaining = fillEmptyRange(inventory, remaining, HOTBAR_START, MAIN_GRID_START);
+                    remaining = fillEmptyRange(inventory, remaining, MAIN_GRID_START, BACKEND_START);
+                }
+                case INVENTORY_FIRST -> {
+                    remaining = fillEmptyRange(inventory, remaining, MAIN_GRID_START, BACKEND_START);
+                    remaining = fillEmptyRange(inventory, remaining, HOTBAR_START, MAIN_GRID_START);
+                }
+                case STOWED_FIRST -> remaining = inventory.insertAtOrAfter(
+                        remaining, BACKEND_START, false).remainder();
             }
         }
 

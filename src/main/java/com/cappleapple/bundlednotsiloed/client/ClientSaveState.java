@@ -167,8 +167,6 @@ public final class ClientSaveState {
         put(settings, "pickupLimitNotification", ClientConfig.PICKUP_NOTIFICATION.get().name());
         put(settings, "enableSearchTooltipIndexing", ClientConfig.TOOLTIP_INDEXING.getAsBoolean());
         put(settings, "enableHotbarCycleOverlay", ClientConfig.HOTBAR_CYCLE_OVERLAY.getAsBoolean());
-        put(settings, "categorySelectorX", ClientConfig.CATEGORY_SELECTOR_X.getAsInt());
-        put(settings, "categorySelectorY", ClientConfig.CATEGORY_SELECTOR_Y.getAsInt());
         put(settings, "browserViewMode", ClientConfig.BROWSER_VIEW_MODE.get().name());
         put(settings, "browserGridColumns", ClientConfig.BROWSER_GRID_COLUMNS.getAsInt());
         put(settings, "browserGridRows", ClientConfig.BROWSER_GRID_ROWS.getAsInt());
@@ -198,8 +196,6 @@ public final class ClientSaveState {
         setEnum(settings, "pickupLimitNotification", ClientConfig.PickupNotification.class, ClientConfig.PICKUP_NOTIFICATION::set);
         setBoolean(settings, "enableSearchTooltipIndexing", ClientConfig.TOOLTIP_INDEXING::set);
         setBoolean(settings, "enableHotbarCycleOverlay", ClientConfig.HOTBAR_CYCLE_OVERLAY::set);
-        setInteger(settings, "categorySelectorX", -256, 512, ClientConfig.CATEGORY_SELECTOR_X::set);
-        setInteger(settings, "categorySelectorY", -256, 512, ClientConfig.CATEGORY_SELECTOR_Y::set);
         setEnum(settings, "browserViewMode", ClientConfig.BrowserViewMode.class, ClientConfig.BROWSER_VIEW_MODE::set);
         setInteger(settings, "browserGridColumns", 1, 16, ClientConfig.BROWSER_GRID_COLUMNS::set);
         setInteger(settings, "browserGridRows", 1, 20, ClientConfig.BROWSER_GRID_ROWS::set);
