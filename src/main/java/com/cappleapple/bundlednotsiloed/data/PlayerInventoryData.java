@@ -23,6 +23,7 @@ public final class PlayerInventoryData implements INBTSerializable<CompoundTag> 
     private SortMode inventorySortPreference = SortMode.NAME_ASCENDING;
     private ResourceLocation selectedCategoryPreference;
     private boolean pickupIntoHotbar = true;
+    private boolean autoRefill = true;
 
     public PlayerInventoryData(Player owner) {
         this.owner = owner;
@@ -45,6 +46,8 @@ public final class PlayerInventoryData implements INBTSerializable<CompoundTag> 
     public void setSelectedCategoryPreference(@Nullable ResourceLocation preference) { selectedCategoryPreference = preference; }
     public boolean pickupIntoHotbar() { return pickupIntoHotbar; }
     public void setPickupIntoHotbar(boolean value) { pickupIntoHotbar = value; }
+    public boolean autoRefill() { return autoRefill; }
+    public void setAutoRefill(boolean value) { autoRefill = value; }
 
     /** Client-owned category, hotbar, and inventory-view customization. */
     public CompoundTag saveCustomization(HolderLookup.Provider provider) {
@@ -54,6 +57,7 @@ public final class PlayerInventoryData implements INBTSerializable<CompoundTag> 
         root.putString("InventorySortPreference", inventorySortPreference.name());
         if (selectedCategoryPreference != null) root.putString("SelectedCategoryPreference", selectedCategoryPreference.toString());
         root.putBoolean("PickupIntoHotbar", pickupIntoHotbar);
+        root.putBoolean("AutoRefill", autoRefill);
         return root;
     }
 
@@ -122,5 +126,6 @@ public final class PlayerInventoryData implements INBTSerializable<CompoundTag> 
         }
         selectedCategoryPreference = ResourceLocation.tryParse(root.getString("SelectedCategoryPreference"));
         pickupIntoHotbar = !root.contains("PickupIntoHotbar") || root.getBoolean("PickupIntoHotbar");
+        autoRefill = !root.contains("AutoRefill") || root.getBoolean("AutoRefill");
     }
 }

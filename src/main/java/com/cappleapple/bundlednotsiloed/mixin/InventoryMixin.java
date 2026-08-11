@@ -6,9 +6,11 @@ import com.cappleapple.bundlednotsiloed.data.PlayerInventoryData;
 import com.cappleapple.stacksnotslots.api.inventory.DynamicCapacityInventory;
 import com.cappleapple.bundlednotsiloed.inventory.InsertionContext;
 import com.cappleapple.bundlednotsiloed.inventory.InventoryTransactions;
+import com.cappleapple.bundlednotsiloed.inventory.VisibleStackRefill;
 import java.util.List;
 import java.util.function.Predicate;
 import net.minecraft.core.NonNullList;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -28,8 +30,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 /** Keeps vanilla's 36 item indices as stable compatibility positions; backend storage remains dynamic. */
 @Mixin(Inventory.class)
 public abstract class InventoryMixin {
+    @Unique private static final int BNS_VIRTUAL_BACKEND_SLOT = Integer.MAX_VALUE;
     @Shadow @Final public Player player;
     @Shadow @Final public NonNullList<ItemStack> items;
+    @Unique private int sns$recipeBackingSlot = -1;
 
     @Unique
     private PlayerInventoryData sns$data() { return player.getData(ModAttachments.PLAYER_DATA); }
@@ -49,6 +53,10 @@ public abstract class InventoryMixin {
 
     @Inject(method = "getItem", at = @At("HEAD"), cancellable = true)
     private void sns$getItem(int slot, CallbackInfoReturnable<ItemStack> callback) {
+        if (sns$active() && slot == BNS_VIRTUAL_BACKEND_SLOT && sns$recipeBackingSlot >= Inventory.INVENTORY_SIZE) {
+            callback.setReturnValue(sns$data().inventory().vanillaStackReference(sns$recipeBackingSlot));
+            return;
+        }
         if (sns$active() && slot >= 0 && slot < Inventory.INVENTORY_SIZE) {
             callback.setReturnValue(sns$data().inventory().vanillaStackReference(sns$logicalIndex(slot)));
         }
@@ -86,6 +94,12 @@ public abstract class InventoryMixin {
 
     @Inject(method = "removeItem", at = @At("HEAD"), cancellable = true)
     private void sns$removeItem(int slot, int amount, CallbackInfoReturnable<ItemStack> callback) {
+        if (sns$active() && slot == BNS_VIRTUAL_BACKEND_SLOT && sns$recipeBackingSlot >= Inventory.INVENTORY_SIZE) {
+            int backingSlot = sns$recipeBackingSlot;
+            sns$recipeBackingSlot = -1;
+            callback.setReturnValue(sns$data().inventory().extractSyntheticSlot(backingSlot, amount, false));
+            return;
+        }
         if (sns$active() && slot >= 0 && slot < Inventory.INVENTORY_SIZE) {
             callback.setReturnValue(sns$data().inventory().extractSyntheticSlot(sns$logicalIndex(slot), amount, false));
         }
@@ -93,6 +107,12 @@ public abstract class InventoryMixin {
 
     @Inject(method = "removeItemNoUpdate", at = @At("HEAD"), cancellable = true)
     private void sns$removeItemNoUpdate(int slot, CallbackInfoReturnable<ItemStack> callback) {
+        if (sns$active() && slot == BNS_VIRTUAL_BACKEND_SLOT && sns$recipeBackingSlot >= Inventory.INVENTORY_SIZE) {
+            int backingSlot = sns$recipeBackingSlot;
+            sns$recipeBackingSlot = -1;
+            callback.setReturnValue(sns$data().inventory().extractSyntheticSlot(backingSlot, Integer.MAX_VALUE, false));
+            return;
+        }
         if (!sns$active() || slot < 0 || slot >= Inventory.INVENTORY_SIZE) return;
         DynamicCapacityInventory inventory = sns$data().inventory();
         int index = sns$logicalIndex(slot);
@@ -130,6 +150,25 @@ public abstract class InventoryMixin {
         if (!sns$active()) return;
         int index = sns$data().inventory().indexOf(stack);
         callback.setReturnValue(index < 0 ? -1 : sns$vanillaSlotForLogical(index));
+    }
+
+    @Inject(method = "findSlotMatchingUnusedItem", at = @At("HEAD"), cancellable = true)
+    private void sns$findUnusedMatching(ItemStack stack, CallbackInfoReturnable<Integer> callback) {
+        if (!sns$active()) return;
+        sns$recipeBackingSlot = -1;
+        List<ItemStack> stacks = sns$data().inventory().backingStacks();
+        for (int index = 0; index < stacks.size(); index++) {
+            ItemStack stored = stacks.get(index);
+            if (stored.isEmpty() || !ItemStack.isSameItemSameComponents(stack, stored)
+                    || stored.isDamaged() || stored.isEnchanted() || stored.has(DataComponents.CUSTOM_NAME)) continue;
+            if (index < Inventory.INVENTORY_SIZE) callback.setReturnValue(index);
+            else {
+                sns$recipeBackingSlot = index;
+                callback.setReturnValue(BNS_VIRTUAL_BACKEND_SLOT);
+            }
+            return;
+        }
+        callback.setReturnValue(-1);
     }
 
     @Inject(method = "getSlotWithRemainingSpace", at = @At("HEAD"), cancellable = true)
@@ -177,6 +216,10 @@ public abstract class InventoryMixin {
         if (!sns$active()) return;
         sns$data().reconcileVanillaCompatibilityView();
         sns$data().inventory().tick(player);
+        if (!player.level().isClientSide && sns$data().autoRefill()
+                && VisibleStackRefill.refill(sns$data().inventory())) {
+            player.containerMenu.broadcastChanges();
+        }
         callback.cancel();
     }
 

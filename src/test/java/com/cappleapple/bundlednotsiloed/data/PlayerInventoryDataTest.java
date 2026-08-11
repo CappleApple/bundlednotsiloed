@@ -18,13 +18,16 @@ class PlayerInventoryDataTest {
         RegistryAccess.Frozen access = RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY);
         PlayerInventoryData original = new PlayerInventoryData(null);
         original.setPickupIntoHotbar(false);
+        original.setAutoRefill(false);
 
         PlayerInventoryData loaded = new PlayerInventoryData(null);
         loaded.loadMetadata(access, original.saveMetadata(access));
         assertFalse(loaded.pickupIntoHotbar());
+        assertFalse(loaded.autoRefill());
 
         PlayerInventoryData legacy = new PlayerInventoryData(null);
         legacy.loadMetadata(access, new net.minecraft.nbt.CompoundTag());
         assertTrue(legacy.pickupIntoHotbar());
+        assertTrue(legacy.autoRefill());
     }
 }

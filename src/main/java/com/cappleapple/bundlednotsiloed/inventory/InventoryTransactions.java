@@ -29,9 +29,10 @@ public final class InventoryTransactions {
                 : stack.getCount();
         InsertionRejection limitingReason = allowed < stack.getCount() ? InsertionRejection.CATEGORY_LIMIT : InsertionRejection.NONE;
 
-        int minimumSlot = context == InsertionContext.WORLD_PICKUP && !data.pickupIntoHotbar() ? 9 : 0;
         ItemStack limitedStack = allowed == stack.getCount() ? stack : stack.copyWithCount(allowed);
-        InsertionResult limitedProposal = inventory.insertAtOrAfter(limitedStack, minimumSlot, true);
+        InsertionResult limitedProposal = context == InsertionContext.WORLD_PICKUP
+                ? WorldPickupInsertion.insert(inventory, limitedStack, data.pickupIntoHotbar(), true)
+                : inventory.insertAtOrAfter(limitedStack, 0, true);
         InsertionResult proposed = allowed == stack.getCount() ? limitedProposal : new InsertionResult(
                 stack.getCount(), limitedProposal.acceptedAmount(),
                 stack.copyWithCount(stack.getCount() - limitedProposal.acceptedAmount()),
@@ -44,7 +45,9 @@ public final class InventoryTransactions {
             return new InsertionResult(stack.getCount(), 0, stack.copy(), 0, rejection);
         }
         if (simulate) return proposed;
-        InsertionResult committed = inventory.insertAtOrAfter(limitedStack, minimumSlot, false);
+        InsertionResult committed = context == InsertionContext.WORLD_PICKUP
+                ? WorldPickupInsertion.insert(inventory, limitedStack, data.pickupIntoHotbar(), false)
+                : inventory.insertAtOrAfter(limitedStack, 0, false);
         if (allowed == stack.getCount()) return committed;
         int accepted = committed.acceptedAmount();
         ItemStack remainder = accepted == stack.getCount() ? ItemStack.EMPTY : stack.copyWithCount(stack.getCount() - accepted);

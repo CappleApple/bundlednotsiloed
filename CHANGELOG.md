@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.1 - 2026-08-11
+
+### Added
+
+- Added default-on automatic refilling of existing hotbar and main-inventory stacks from matching stowed items.
+- Added a persistent auto-refill toggle to the inventory-browser settings and an unbound-by-default keybind under Controls.
+
+### Changed
+
+- JEI and EMI recipe transfer now count ingredients across the complete unified inventory, including stowed items, and request server-authoritative vanilla recipe placement.
+- World pickups now top up matching visible stacks first. New item types enter the main inventory from left to right and top to bottom, while items already present only in stowed storage join their stowed stack.
+- Pickup overflow from a matching visible stack is stowed instead of occupying an unrelated empty visible slot.
+
+### Fixed
+
+- Fixed JEI and EMI reporting that recipes could not be autofilled when the required ingredients were stowed.
+- Fixed newly encountered item types entering an empty hotbar before available main-inventory slots.
+
 ## 1.0 - 2026-08-10
 
 - Promoted the integrated player-facing mod and its API dependencies to version 1.0 with no functional changes.

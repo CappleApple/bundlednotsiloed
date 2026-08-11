@@ -2,6 +2,8 @@ package com.cappleapple.bundlednotsiloed.client;
 
 import com.cappleapple.bundlednotsiloed.client.screen.CapacityInventoryScreen;
 import com.cappleapple.bundlednotsiloed.config.ClientConfig;
+import com.cappleapple.bundlednotsiloed.data.ModAttachments;
+import com.cappleapple.bundlednotsiloed.network.AutoRefillPayload;
 import com.cappleapple.bundlednotsiloed.network.HotbarCyclePayload;
 import com.cappleapple.bundlednotsiloed.network.BulkTransferPayload;
 import net.minecraft.client.Minecraft;
@@ -56,6 +58,14 @@ public final class ClientEvents {
         }
         while (ClientKeyMappings.EXTRACT_FROM_CONTAINER.consumeClick()) {
             PacketDistributor.sendToServer(new BulkTransferPayload(BulkTransferPayload.Direction.FROM_CONTAINER, target));
+        }
+        while (ClientKeyMappings.TOGGLE_AUTO_REFILL.consumeClick()) {
+            var data = minecraft.player.getData(ModAttachments.PLAYER_DATA);
+            boolean enabled = !data.autoRefill();
+            data.setAutoRefill(enabled);
+            PacketDistributor.sendToServer(new AutoRefillPayload(enabled));
+            minecraft.player.displayClientMessage(Component.translatable(
+                    enabled ? "message.bundlednotsiloed.auto_refill_on" : "message.bundlednotsiloed.auto_refill_off"), true);
         }
     }
 

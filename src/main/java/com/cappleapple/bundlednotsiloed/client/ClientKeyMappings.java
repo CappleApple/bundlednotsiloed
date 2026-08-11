@@ -20,6 +20,8 @@ public final class ClientKeyMappings {
             KeyConflictContext.UNIVERSAL, KeyModifier.CONTROL, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_G, CATEGORY);
     public static final KeyMapping EXTRACT_FROM_CONTAINER = new KeyMapping("key.bundlednotsiloed.extract_from_container",
             KeyConflictContext.UNIVERSAL, KeyModifier.CONTROL, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_H, CATEGORY);
+    public static final KeyMapping TOGGLE_AUTO_REFILL = new KeyMapping("key.bundlednotsiloed.toggle_auto_refill",
+            KeyConflictContext.UNIVERSAL, KeyModifier.NONE, InputConstants.Type.KEYSYM, InputConstants.UNKNOWN.getValue(), CATEGORY);
 
     private ClientKeyMappings() {}
 
@@ -30,5 +32,6 @@ public final class ClientKeyMappings {
         event.register(CYCLE_BACKWARD);
         event.register(DUMP_TO_CONTAINER);
         event.register(EXTRACT_FROM_CONTAINER);
+        event.register(TOGGLE_AUTO_REFILL);
     }
 }

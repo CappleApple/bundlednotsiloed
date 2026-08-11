@@ -7,6 +7,7 @@
   "key.bundlednotsiloed.cycle_backward": "Cycle Hotbar Binding Backward",
   "key.bundlednotsiloed.dump_to_container": "Dump Inventory to Container",
   "key.bundlednotsiloed.extract_from_container": "Extract Container to Inventory",
+  "key.bundlednotsiloed.toggle_auto_refill": "Toggle Stowed Stack Auto-Refill",
   "gui.bundlednotsiloed.empty": "Empty",
   "gui.bundlednotsiloed.search": "Inventory Search",
   "gui.bundlednotsiloed.search_hint": "Search..",
@@ -35,6 +36,7 @@
   "gui.bundlednotsiloed.dead_zone_x": "Auto-side X dead zone",
   "gui.bundlednotsiloed.dead_zone_y": "Auto-side Y dead zone",
   "gui.bundlednotsiloed.bulk_overlay": "World transfer popup: %s",
+  "gui.bundlednotsiloed.auto_refill": "Stowed stack auto-refill: %s",
   "gui.bundlednotsiloed.overlay_seconds": "World transfer popup seconds",
   "gui.bundlednotsiloed.handle_icon": "Browser handle icon item ID",
   "gui.bundlednotsiloed.default_browser_placement": "New UI placement: %s",
@@ -87,6 +89,7 @@
   "tooltip.bundlednotsiloed.dead_zone_x": "Horizontal half-width in screen pixels around the center where automatic side selection does not change. Default 48.",
   "tooltip.bundlednotsiloed.dead_zone_y": "Vertical half-height in screen pixels around the center where automatic side selection does not change. Default 36.",
   "tooltip.bundlednotsiloed.bulk_overlay": "Shows a compact item grid after an in-world dump or extraction. The counts are rounded up to stacks.",
+  "tooltip.bundlednotsiloed.auto_refill": "Automatically tops up existing hotbar and main-inventory stacks from matching stowed items. Enabled by default.",
   "tooltip.bundlednotsiloed.overlay_seconds": "How long the in-world bulk-transfer grid remains visible. Range 0.25-30 seconds; default 2.5.",
   "tooltip.bundlednotsiloed.handle_icon": "Item ID rendered on the draggable browser handle, or bundlednotsiloed:logo for the built-in logo. Default bundlednotsiloed:logo.",
   "tooltip.bundlednotsiloed.default_browser_placement": "Default handle anchor for container-screen types without a saved position. Choices: bottom, center, or top on either side. Bottom Right aligns beside the player's hotbar.",
@@ -101,5 +104,9 @@
   "sort.bundlednotsiloed.mod_namespace": "Mod Namespace",
   "message.bundlednotsiloed.category_limit": "Category pickup limit reached",
   "message.bundlednotsiloed.inventory_full": "Inventory full: %s / %s",
+  "message.bundlednotsiloed.auto_refill_on": "Stowed stack auto-refill enabled",
+  "message.bundlednotsiloed.auto_refill_off": "Stowed stack auto-refill disabled",
+  "message.bundlednotsiloed.recipe_missing": "Not enough ingredients in the unified inventory",
+  "message.bundlednotsiloed.recipe_too_large": "This recipe does not fit the open crafting grid",
   "message.bundlednotsiloed.unsafe_sophisticated_binding": "Sophisticated Core's %s control is bound to plain left-click and is blocking its inventory UI. Rebind it under Controls."
 }

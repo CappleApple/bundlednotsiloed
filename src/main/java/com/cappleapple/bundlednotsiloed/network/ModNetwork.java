@@ -11,6 +11,7 @@ import com.cappleapple.bundlednotsiloed.category.CategoryPresetManager;
 import com.cappleapple.bundlednotsiloed.category.CategoryRule;
 import com.cappleapple.bundlednotsiloed.category.PlayerCategoryData;
 import com.cappleapple.bundlednotsiloed.compat.InventoryProjection;
+import com.cappleapple.bundlednotsiloed.compat.RecipeTransferService;
 import com.cappleapple.stacksnotslots.api.ExtractionResult;
 import com.cappleapple.bundlednotsiloed.hotbar.BindingType;
 import com.cappleapple.bundlednotsiloed.hotbar.HotbarBinding;
@@ -58,7 +59,7 @@ public final class ModNetwork {
     private ModNetwork() {}
 
     public static void registerPayloads(RegisterPayloadHandlersEvent event) {
-        var registrar = event.registrar("7");
+        var registrar = event.registrar("8");
         registrar.playToClient(InventorySnapshotPayload.TYPE, InventorySnapshotPayload.STREAM_CODEC, ModNetwork::receiveSnapshot);
         registrar.playToClient(InventoryDeltaPayload.TYPE, InventoryDeltaPayload.STREAM_CODEC, ModNetwork::receiveDelta);
         registrar.playToClient(PlayerMetadataPayload.TYPE, PlayerMetadataPayload.STREAM_CODEC, ModNetwork::receiveMetadata);
@@ -73,6 +74,8 @@ public final class ModNetwork {
         registrar.playToServer(StowSlotPayload.TYPE, StowSlotPayload.STREAM_CODEC, ModNetwork::stowSlot);
         registrar.playToServer(StowMainGridPayload.TYPE, StowMainGridPayload.STREAM_CODEC, ModNetwork::stowMainGrid);
         registrar.playToServer(PickupToHotbarPayload.TYPE, PickupToHotbarPayload.STREAM_CODEC, ModNetwork::updatePickupToHotbar);
+        registrar.playToServer(AutoRefillPayload.TYPE, AutoRefillPayload.STREAM_CODEC, ModNetwork::updateAutoRefill);
+        registrar.playToServer(RecipeTransferPayload.TYPE, RecipeTransferPayload.STREAM_CODEC, ModNetwork::transferRecipe);
         registrar.playToServer(BrowserTransferPayload.TYPE, BrowserTransferPayload.STREAM_CODEC, ModNetwork::transferBrowserEntry);
         registrar.playToServer(BrowserStatePayload.TYPE, BrowserStatePayload.STREAM_CODEC, ModNetwork::browserState);
         registrar.playToServer(BulkTransferPayload.TYPE, BulkTransferPayload.STREAM_CODEC, ModNetwork::bulkTransfer);
@@ -362,6 +365,18 @@ public final class ModNetwork {
         PlayerInventoryData data = player.getData(ModAttachments.PLAYER_DATA);
         data.setPickupIntoHotbar(payload.enabled());
         sendMetadata(player);
+    }
+
+    private static void updateAutoRefill(AutoRefillPayload payload, IPayloadContext context) {
+        if (!(context.player() instanceof ServerPlayer player) || !allowAction(player)) return;
+        PlayerInventoryData data = player.getData(ModAttachments.PLAYER_DATA);
+        data.setAutoRefill(payload.enabled());
+        sendMetadata(player);
+    }
+
+    private static void transferRecipe(RecipeTransferPayload payload, IPayloadContext context) {
+        if (!(context.player() instanceof ServerPlayer player) || !allowAction(player)) return;
+        RecipeTransferService.transfer(player, payload.recipeId(), payload.placeAll());
     }
 
     private static void stowMainGrid(StowMainGridPayload payload, IPayloadContext context) {

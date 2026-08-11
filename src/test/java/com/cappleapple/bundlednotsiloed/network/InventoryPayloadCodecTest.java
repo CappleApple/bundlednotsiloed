@@ -13,6 +13,7 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -90,9 +91,16 @@ class InventoryPayloadCodecTest {
         try {
             StowSlotPayload.STREAM_CODEC.encode(buffer, new StowSlotPayload(-1));
             PickupToHotbarPayload.STREAM_CODEC.encode(buffer, new PickupToHotbarPayload(false));
+            AutoRefillPayload.STREAM_CODEC.encode(buffer, new AutoRefillPayload(true));
+            ResourceLocation recipeId = ResourceLocation.fromNamespaceAndPath("minecraft", "wooden_pickaxe");
+            RecipeTransferPayload.STREAM_CODEC.encode(buffer, new RecipeTransferPayload(recipeId, true));
             buffer.readerIndex(0);
             assertEquals(-1, StowSlotPayload.STREAM_CODEC.decode(buffer).slot());
             assertTrue(!PickupToHotbarPayload.STREAM_CODEC.decode(buffer).enabled());
+            assertTrue(AutoRefillPayload.STREAM_CODEC.decode(buffer).enabled());
+            RecipeTransferPayload transfer = RecipeTransferPayload.STREAM_CODEC.decode(buffer);
+            assertEquals(recipeId, transfer.recipeId());
+            assertTrue(transfer.placeAll());
         } finally {
             buffer.release();
         }

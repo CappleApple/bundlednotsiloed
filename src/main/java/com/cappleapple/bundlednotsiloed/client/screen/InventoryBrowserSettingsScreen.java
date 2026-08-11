@@ -2,6 +2,8 @@ package com.cappleapple.bundlednotsiloed.client.screen;
 
 import com.cappleapple.bundlednotsiloed.client.ClientSaveState;
 import com.cappleapple.bundlednotsiloed.config.ClientConfig;
+import com.cappleapple.bundlednotsiloed.data.ModAttachments;
+import com.cappleapple.bundlednotsiloed.network.AutoRefillPayload;
 import java.util.Locale;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -9,6 +11,7 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 public final class InventoryBrowserSettingsScreen extends Screen {
     private final Screen parent;
@@ -18,11 +21,13 @@ public final class InventoryBrowserSettingsScreen extends Screen {
     private ClientConfig.BrowserDefaultPlacement defaultPlacement = ClientConfig.BROWSER_DEFAULT_PLACEMENT.get();
     private boolean autoSide = ClientConfig.AUTO_BROWSER_DOCK_SIDE.getAsBoolean();
     private boolean transferOverlay = ClientConfig.BULK_TRANSFER_OVERLAY.getAsBoolean();
+    private boolean autoRefill;
     private Button viewButton;
     private Button itemCountButton;
     private Button overallCountButton;
     private Button autoSideButton;
     private Button transferOverlayButton;
+    private Button autoRefillButton;
     private Button defaultPlacementButton;
     private EditBox columns;
     private EditBox rows;
@@ -41,6 +46,8 @@ public final class InventoryBrowserSettingsScreen extends Screen {
     @Override
     protected void init() {
         int left = width / 2 - 160;
+        autoRefill = minecraft.player == null
+                || minecraft.player.getData(ModAttachments.PLAYER_DATA).autoRefill();
         viewButton = button(left, 28, 158, ignored -> {
             viewMode = next(viewMode);
             updateButtons();
@@ -54,35 +61,39 @@ public final class InventoryBrowserSettingsScreen extends Screen {
                 "gui.bundlednotsiloed.grid_columns", "tooltip.bundlednotsiloed.grid_columns");
         rows = field(left + 162, 50, 158, Integer.toString(ClientConfig.BROWSER_GRID_ROWS.getAsInt()),
                 "gui.bundlednotsiloed.grid_rows", "tooltip.bundlednotsiloed.grid_rows");
-        itemCountButton = button(left, 72, 320, ignored -> {
+        itemCountButton = button(left, 72, 158, ignored -> {
             itemCountMode = next(itemCountMode);
             updateButtons();
         }, "tooltip.bundlednotsiloed.item_count_mode");
-        overallCountButton = button(left, 94, 320, ignored -> {
+        overallCountButton = button(left + 162, 72, 158, ignored -> {
             overallCountMode = next(overallCountMode);
             updateButtons();
         }, "tooltip.bundlednotsiloed.overall_count_mode");
 
-        deadZoneX = field(left, 116, 158, Integer.toString(ClientConfig.AUTO_DOCK_DEAD_ZONE_X.getAsInt()),
+        deadZoneX = field(left, 94, 158, Integer.toString(ClientConfig.AUTO_DOCK_DEAD_ZONE_X.getAsInt()),
                 "gui.bundlednotsiloed.dead_zone_x", "tooltip.bundlednotsiloed.dead_zone_x");
-        deadZoneY = field(left + 162, 116, 158, Integer.toString(ClientConfig.AUTO_DOCK_DEAD_ZONE_Y.getAsInt()),
+        deadZoneY = field(left + 162, 94, 158, Integer.toString(ClientConfig.AUTO_DOCK_DEAD_ZONE_Y.getAsInt()),
                 "gui.bundlednotsiloed.dead_zone_y", "tooltip.bundlednotsiloed.dead_zone_y");
-        transferOverlayButton = button(left, 138, 158, ignored -> {
+        transferOverlayButton = button(left, 116, 158, ignored -> {
             transferOverlay = !transferOverlay;
             updateButtons();
         }, "tooltip.bundlednotsiloed.bulk_overlay");
-        overlaySeconds = field(left + 162, 138, 158, Double.toString(ClientConfig.BULK_TRANSFER_OVERLAY_SECONDS.get()),
+        autoRefillButton = button(left + 162, 116, 158, ignored -> {
+            autoRefill = !autoRefill;
+            updateButtons();
+        }, "tooltip.bundlednotsiloed.auto_refill");
+        overlaySeconds = field(left, 138, 158, Double.toString(ClientConfig.BULK_TRANSFER_OVERLAY_SECONDS.get()),
                 "gui.bundlednotsiloed.overlay_seconds", "tooltip.bundlednotsiloed.overlay_seconds");
 
         handleIcon = field(left, 160, 158, ClientConfig.BROWSER_HANDLE_ICON.get(),
                 "gui.bundlednotsiloed.handle_icon", "tooltip.bundlednotsiloed.handle_icon");
-        defaultPlacementButton = button(left + 162, 160, 158, ignored -> {
+        defaultPlacementButton = button(left + 162, 138, 158, ignored -> {
             defaultPlacement = next(defaultPlacement);
             updateButtons();
         }, "tooltip.bundlednotsiloed.default_browser_placement");
-        manageIcon = field(left, 182, 158, ClientConfig.MANAGE_TABS_ICON.get(),
+        manageIcon = field(left + 162, 160, 158, ClientConfig.MANAGE_TABS_ICON.get(),
                 "gui.bundlednotsiloed.manage_icon", "tooltip.bundlednotsiloed.configurable_icon");
-        settingsIcon = field(left + 162, 182, 158, ClientConfig.SETTINGS_ICON.get(),
+        settingsIcon = field(left, 182, 320, ClientConfig.SETTINGS_ICON.get(),
                 "gui.bundlednotsiloed.settings_icon", "tooltip.bundlednotsiloed.configurable_icon");
         addRenderableWidget(Button.builder(Component.translatable("gui.done"), ignored -> saveAndClose())
                 .bounds(left, Math.max(206, height - 24), 320, 20).build());
@@ -110,6 +121,7 @@ public final class InventoryBrowserSettingsScreen extends Screen {
         itemCountButton.setMessage(Component.translatable("gui.bundlednotsiloed.item_count_mode", display(itemCountMode)));
         overallCountButton.setMessage(Component.translatable("gui.bundlednotsiloed.overall_count_mode", display(overallCountMode)));
         transferOverlayButton.setMessage(Component.translatable("gui.bundlednotsiloed.bulk_overlay", onOff(transferOverlay)));
+        autoRefillButton.setMessage(Component.translatable("gui.bundlednotsiloed.auto_refill", onOff(autoRefill)));
         defaultPlacementButton.setMessage(Component.translatable(
                 "gui.bundlednotsiloed.default_browser_placement", display(defaultPlacement)));
     }
@@ -137,6 +149,10 @@ public final class InventoryBrowserSettingsScreen extends Screen {
         ClientConfig.BROWSER_HANDLE_ICON.set(handleIcon.getValue().trim());
         ClientConfig.MANAGE_TABS_ICON.set(manageIcon.getValue().trim());
         ClientConfig.SETTINGS_ICON.set(settingsIcon.getValue().trim());
+        if (minecraft.player != null) {
+            minecraft.player.getData(ModAttachments.PLAYER_DATA).setAutoRefill(autoRefill);
+            PacketDistributor.sendToServer(new AutoRefillPayload(autoRefill));
+        }
         ClientSaveState.saveClientSettings();
         onClose();
     }
