@@ -65,7 +65,7 @@ Linux/macOS:
 ./gradlew runServer
 ```
 
-The built mod is written to `build/libs/bundlednotsiloed-1.2.jar`. The project uses official Mojang mappings with Parchment parameter names and ModDevGradle's Minecraft-aware JUnit support.
+The built mod is written to `build/libs/bundlednotsiloed-1.2.1.jar`. The project uses official Mojang mappings with Parchment parameter names and ModDevGradle's Minecraft-aware JUnit support.
 
 ## Player usage
 
@@ -98,6 +98,8 @@ The effective limit is the floored, non-negative value of the player's `bundledn
 ```
 
 If capacity falls below current usage, no item is deleted or moved. New positive-cost insertion is rejected until enough capacity is restored or items are removed. Dropping, consuming, crafting with, and transferring items out remain valid.
+
+While the cursor holds a stack that cannot add even one item, the browser handle changes to a barrier. Empty projected player slots can also show visual-only barriers; attempting a capacity-blocked placement plays the configured client sound. Valid replacements that reclaim the occupied slot's capacity remain available.
 
 If a committed held-item transformation produces a higher-cost result, the result is preserved and the player enters the normal over-capacity state rather than losing the item or crashing the operation.
 
@@ -146,6 +148,8 @@ Client defaults/settings:
 - `autoChooseBrowserSide` - optional side selection while dragging
 - `autoSideDeadZoneX` / `autoSideDeadZoneY` - center-screen dead-zone half sizes for automatic docking
 - `showBulkTransferOverlay` / `bulkTransferOverlaySeconds` - in-world bulk-transfer feedback and duration
+- `showFullInventoryBarrierIcons` - default `true`; when a cursor-held stack cannot add even one item, empty projected player slots display visual-only barrier icons
+- `inventoryFullSound` - sound event played after a cursor placement fails for lack of capacity; default `minecraft:block.note_block.bass`, or blank to disable
 
 ## Default preset schema
 

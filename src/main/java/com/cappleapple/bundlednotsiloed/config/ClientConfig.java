@@ -38,6 +38,8 @@ public final class ClientConfig {
     public static final ModConfigSpec.IntValue AUTO_DOCK_DEAD_ZONE_Y;
     public static final ModConfigSpec.BooleanValue BULK_TRANSFER_OVERLAY;
     public static final ModConfigSpec.DoubleValue BULK_TRANSFER_OVERLAY_SECONDS;
+    public static final ModConfigSpec.BooleanValue FULL_INVENTORY_BARRIER_ICONS;
+    public static final ModConfigSpec.ConfigValue<String> INVENTORY_FULL_SOUND;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -70,6 +72,10 @@ public final class ClientConfig {
         AUTO_DOCK_DEAD_ZONE_Y = builder.defineInRange("autoSideDeadZoneY", 36, 0, 4096);
         BULK_TRANSFER_OVERLAY = builder.define("showBulkTransferOverlay", true);
         BULK_TRANSFER_OVERLAY_SECONDS = builder.defineInRange("bulkTransferOverlaySeconds", 2.5D, 0.25D, 30.0D);
+        FULL_INVENTORY_BARRIER_ICONS = builder.comment("Show barrier icons in empty projected player slots while the cursor-held stack has no capacity available")
+                .define("showFullInventoryBarrierIcons", true);
+        INVENTORY_FULL_SOUND = builder.comment("Sound event played after a cursor placement fails for lack of player-inventory capacity; leave blank to disable")
+                .define("inventoryFullSound", "minecraft:block.note_block.bass");
         SPEC = builder.build();
     }
 

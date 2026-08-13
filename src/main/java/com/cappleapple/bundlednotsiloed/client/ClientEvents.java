@@ -14,6 +14,7 @@ import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
+import net.neoforged.neoforge.client.event.ContainerScreenEvent;
 import net.neoforged.neoforge.client.event.RenderGuiEvent;
 import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -126,6 +127,16 @@ public final class ClientEvents {
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void initializeContainerOverlay(ScreenEvent.Init.Post event) {
         ContainerInventoryOverlay.initialize(event);
+    }
+
+    @SubscribeEvent
+    public static void renderFullInventoryBarriers(ContainerScreenEvent.Render.Foreground event) {
+        InventoryFullFeedback.renderBarrierIcons(event);
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void releaseFullInventoryPlacement(ScreenEvent.MouseButtonReleased.Pre event) {
+        InventoryFullFeedback.playForFailedPlacement(event);
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)

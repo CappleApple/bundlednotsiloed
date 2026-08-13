@@ -387,6 +387,7 @@ public final class ContainerInventoryOverlay {
         if (inside(mouseX, mouseY, layout.contentX(), layout.contentY(), layout.contentWidth(), layout.contentHeight())
                 && (button == 0 || button == 1)
                 && !Minecraft.getInstance().player.containerMenu.getCarried().isEmpty()) {
+            if (InventoryFullFeedback.cursorCannotFit()) InventoryFullFeedback.playSound();
             PacketDistributor.sendToServer(new StowSlotPayload(-1));
             return true;
         }
@@ -564,7 +565,9 @@ public final class ContainerInventoryOverlay {
         if (!hovered) handleCategoryPreview = null;
         boolean stowMode = Screen.hasShiftDown();
         String configuredHandleIcon = ClientConfig.BROWSER_HANDLE_ICON.get();
-        if (stowMode) {
+        if (InventoryFullFeedback.cursorCannotFit()) {
+            graphics.renderItem(new ItemStack(Items.BARRIER), handleX + 2, handleY + 1);
+        } else if (stowMode) {
             graphics.renderItem(new ItemStack(Items.STICKY_PISTON), handleX + 2, handleY + 1);
         } else if (handleCategoryPreview != null) {
             graphics.renderItem(CategoryIcons.displayStack(handleCategoryPreview), handleX + 2, handleY + 1);

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.1 - 2026-08-13
+
+### Added
+
+- Added a configurable sound for cursor placement attempts that fail because the unified player inventory has no remaining capacity.
+- Empty projected player slots can now show visual-only barrier icons while the cursor-held stack cannot fit; this display is configurable.
+- The inventory-browser handle now changes to a barrier icon while the cursor-held stack cannot fit in the player inventory.
+
 ## 1.2 - 2026-08-11
 
 ### Added

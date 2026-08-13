@@ -187,6 +187,8 @@ public final class ClientSaveState {
         put(settings, "autoSideDeadZoneY", ClientConfig.AUTO_DOCK_DEAD_ZONE_Y.getAsInt());
         put(settings, "showBulkTransferOverlay", ClientConfig.BULK_TRANSFER_OVERLAY.getAsBoolean());
         put(settings, "bulkTransferOverlaySeconds", ClientConfig.BULK_TRANSFER_OVERLAY_SECONDS.get());
+        put(settings, "showFullInventoryBarrierIcons", ClientConfig.FULL_INVENTORY_BARRIER_ICONS.getAsBoolean());
+        put(settings, "inventoryFullSound", ClientConfig.INVENTORY_FULL_SOUND.get());
         data.settings = settings;
     }
 
@@ -216,6 +218,8 @@ public final class ClientSaveState {
         setInteger(settings, "autoSideDeadZoneY", 0, 4096, ClientConfig.AUTO_DOCK_DEAD_ZONE_Y::set);
         setBoolean(settings, "showBulkTransferOverlay", ClientConfig.BULK_TRANSFER_OVERLAY::set);
         setDouble(settings, "bulkTransferOverlaySeconds", 0.25D, 30.0D, ClientConfig.BULK_TRANSFER_OVERLAY_SECONDS::set);
+        setBoolean(settings, "showFullInventoryBarrierIcons", ClientConfig.FULL_INVENTORY_BARRIER_ICONS::set);
+        setString(settings, "inventoryFullSound", ClientConfig.INVENTORY_FULL_SOUND::set);
     }
 
     private static void importLegacyBrowserStates() {

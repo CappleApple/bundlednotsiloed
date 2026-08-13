@@ -23,6 +23,7 @@ public final class InventoryBrowserSettingsScreen extends Screen {
     private ClientConfig.BrowserDefaultPlacement defaultPlacement = ClientConfig.BROWSER_DEFAULT_PLACEMENT.get();
     private boolean autoSide = ClientConfig.AUTO_BROWSER_DOCK_SIDE.getAsBoolean();
     private boolean transferOverlay = ClientConfig.BULK_TRANSFER_OVERLAY.getAsBoolean();
+    private boolean fullInventoryBarrierIcons = ClientConfig.FULL_INVENTORY_BARRIER_ICONS.getAsBoolean();
     private boolean autoRefill;
     private NewItemDestination newItemDestination = NewItemDestination.INVENTORY_FIRST;
     private Button viewButton;
@@ -30,6 +31,7 @@ public final class InventoryBrowserSettingsScreen extends Screen {
     private Button overallCountButton;
     private Button autoSideButton;
     private Button transferOverlayButton;
+    private Button fullInventoryBarrierIconsButton;
     private Button autoRefillButton;
     private Button newItemDestinationButton;
     private Button defaultPlacementButton;
@@ -41,6 +43,7 @@ public final class InventoryBrowserSettingsScreen extends Screen {
     private EditBox handleIcon;
     private EditBox manageIcon;
     private EditBox settingsIcon;
+    private EditBox inventoryFullSound;
 
     public InventoryBrowserSettingsScreen(Screen parent) {
         super(Component.translatable("gui.bundlednotsiloed.browser_settings"));
@@ -55,59 +58,65 @@ public final class InventoryBrowserSettingsScreen extends Screen {
         if (minecraft.player != null) {
             newItemDestination = minecraft.player.getData(ModAttachments.PLAYER_DATA).newItemDestination();
         }
-        viewButton = button(left, 28, 158, ignored -> {
+        viewButton = button(left, 24, 158, ignored -> {
             viewMode = next(viewMode);
             updateButtons();
         }, "tooltip.bundlednotsiloed.browser_view");
-        autoSideButton = button(left + 162, 28, 158, ignored -> {
+        autoSideButton = button(left + 162, 24, 158, ignored -> {
             autoSide = !autoSide;
             updateButtons();
         }, "tooltip.bundlednotsiloed.auto_browser_side");
 
-        columns = field(left, 50, 158, Integer.toString(ClientConfig.BROWSER_GRID_COLUMNS.getAsInt()),
+        columns = field(left, 44, 158, Integer.toString(ClientConfig.BROWSER_GRID_COLUMNS.getAsInt()),
                 "gui.bundlednotsiloed.grid_columns", "tooltip.bundlednotsiloed.grid_columns");
-        rows = field(left + 162, 50, 158, Integer.toString(ClientConfig.BROWSER_GRID_ROWS.getAsInt()),
+        rows = field(left + 162, 44, 158, Integer.toString(ClientConfig.BROWSER_GRID_ROWS.getAsInt()),
                 "gui.bundlednotsiloed.grid_rows", "tooltip.bundlednotsiloed.grid_rows");
-        itemCountButton = button(left, 72, 158, ignored -> {
+        itemCountButton = button(left, 64, 158, ignored -> {
             itemCountMode = next(itemCountMode);
             updateButtons();
         }, "tooltip.bundlednotsiloed.item_count_mode");
-        overallCountButton = button(left + 162, 72, 158, ignored -> {
+        overallCountButton = button(left + 162, 64, 158, ignored -> {
             overallCountMode = next(overallCountMode);
             updateButtons();
         }, "tooltip.bundlednotsiloed.overall_count_mode");
 
-        deadZoneX = field(left, 94, 158, Integer.toString(ClientConfig.AUTO_DOCK_DEAD_ZONE_X.getAsInt()),
+        deadZoneX = field(left, 84, 158, Integer.toString(ClientConfig.AUTO_DOCK_DEAD_ZONE_X.getAsInt()),
                 "gui.bundlednotsiloed.dead_zone_x", "tooltip.bundlednotsiloed.dead_zone_x");
-        deadZoneY = field(left + 162, 94, 158, Integer.toString(ClientConfig.AUTO_DOCK_DEAD_ZONE_Y.getAsInt()),
+        deadZoneY = field(left + 162, 84, 158, Integer.toString(ClientConfig.AUTO_DOCK_DEAD_ZONE_Y.getAsInt()),
                 "gui.bundlednotsiloed.dead_zone_y", "tooltip.bundlednotsiloed.dead_zone_y");
-        transferOverlayButton = button(left, 116, 158, ignored -> {
+        transferOverlayButton = button(left, 104, 158, ignored -> {
             transferOverlay = !transferOverlay;
             updateButtons();
         }, "tooltip.bundlednotsiloed.bulk_overlay");
-        autoRefillButton = button(left + 162, 116, 158, ignored -> {
+        autoRefillButton = button(left + 162, 104, 158, ignored -> {
             autoRefill = !autoRefill;
             updateButtons();
         }, "tooltip.bundlednotsiloed.auto_refill");
-        overlaySeconds = field(left, 138, 158, Double.toString(ClientConfig.BULK_TRANSFER_OVERLAY_SECONDS.get()),
+        overlaySeconds = field(left, 124, 158, Double.toString(ClientConfig.BULK_TRANSFER_OVERLAY_SECONDS.get()),
                 "gui.bundlednotsiloed.overlay_seconds", "tooltip.bundlednotsiloed.overlay_seconds");
 
-        handleIcon = field(left, 160, 158, ClientConfig.BROWSER_HANDLE_ICON.get(),
+        handleIcon = field(left, 144, 158, ClientConfig.BROWSER_HANDLE_ICON.get(),
                 "gui.bundlednotsiloed.handle_icon", "tooltip.bundlednotsiloed.handle_icon");
-        defaultPlacementButton = button(left + 162, 138, 158, ignored -> {
+        defaultPlacementButton = button(left + 162, 124, 158, ignored -> {
             defaultPlacement = next(defaultPlacement);
             updateButtons();
         }, "tooltip.bundlednotsiloed.default_browser_placement");
-        manageIcon = field(left + 162, 160, 158, ClientConfig.MANAGE_TABS_ICON.get(),
+        manageIcon = field(left + 162, 144, 158, ClientConfig.MANAGE_TABS_ICON.get(),
                 "gui.bundlednotsiloed.manage_icon", "tooltip.bundlednotsiloed.configurable_icon");
-        settingsIcon = field(left, 182, 158, ClientConfig.SETTINGS_ICON.get(),
+        settingsIcon = field(left, 164, 158, ClientConfig.SETTINGS_ICON.get(),
                 "gui.bundlednotsiloed.settings_icon", "tooltip.bundlednotsiloed.configurable_icon");
-        newItemDestinationButton = button(left + 162, 182, 158, ignored -> {
+        newItemDestinationButton = button(left + 162, 164, 158, ignored -> {
             newItemDestination = next(newItemDestination);
             updateButtons();
         }, "tooltip.bundlednotsiloed.new_item_destination");
+        fullInventoryBarrierIconsButton = button(left, 184, 158, ignored -> {
+            fullInventoryBarrierIcons = !fullInventoryBarrierIcons;
+            updateButtons();
+        }, "tooltip.bundlednotsiloed.full_inventory_barrier_icons");
+        inventoryFullSound = field(left + 162, 184, 158, ClientConfig.INVENTORY_FULL_SOUND.get(),
+                "gui.bundlednotsiloed.inventory_full_sound", "tooltip.bundlednotsiloed.inventory_full_sound");
         addRenderableWidget(Button.builder(Component.translatable("gui.done"), ignored -> saveAndClose())
-                .bounds(left, Math.max(206, height - 24), 320, 20).build());
+                .bounds(left, Math.max(208, height - 24), 320, 20).build());
         updateButtons();
     }
 
@@ -132,6 +141,8 @@ public final class InventoryBrowserSettingsScreen extends Screen {
         itemCountButton.setMessage(Component.translatable("gui.bundlednotsiloed.item_count_mode", display(itemCountMode)));
         overallCountButton.setMessage(Component.translatable("gui.bundlednotsiloed.overall_count_mode", display(overallCountMode)));
         transferOverlayButton.setMessage(Component.translatable("gui.bundlednotsiloed.bulk_overlay", onOff(transferOverlay)));
+        fullInventoryBarrierIconsButton.setMessage(Component.translatable(
+                "gui.bundlednotsiloed.full_inventory_barrier_icons", onOff(fullInventoryBarrierIcons)));
         autoRefillButton.setMessage(Component.translatable("gui.bundlednotsiloed.auto_refill", onOff(autoRefill)));
         newItemDestinationButton.setMessage(Component.translatable(
                 "gui.bundlednotsiloed.new_item_destination", display(newItemDestination)));
@@ -154,6 +165,7 @@ public final class InventoryBrowserSettingsScreen extends Screen {
         ClientConfig.BROWSER_HANDLE_X.set(-1);
         ClientConfig.BROWSER_HANDLE_Y.set(-1);
         ClientConfig.BULK_TRANSFER_OVERLAY.set(transferOverlay);
+        ClientConfig.FULL_INVENTORY_BARRIER_ICONS.set(fullInventoryBarrierIcons);
         ClientConfig.BROWSER_GRID_COLUMNS.set(parseBounded(columns.getValue(), 1, 16, 4));
         ClientConfig.BROWSER_GRID_ROWS.set(parseBounded(rows.getValue(), 1, 20, 6));
         ClientConfig.AUTO_DOCK_DEAD_ZONE_X.set(parseBounded(deadZoneX.getValue(), 0, 4096, 48));
@@ -162,6 +174,7 @@ public final class InventoryBrowserSettingsScreen extends Screen {
         ClientConfig.BROWSER_HANDLE_ICON.set(handleIcon.getValue().trim());
         ClientConfig.MANAGE_TABS_ICON.set(manageIcon.getValue().trim());
         ClientConfig.SETTINGS_ICON.set(settingsIcon.getValue().trim());
+        ClientConfig.INVENTORY_FULL_SOUND.set(inventoryFullSound.getValue().trim());
         if (minecraft.player != null) {
             var data = minecraft.player.getData(ModAttachments.PLAYER_DATA);
             data.setAutoRefill(autoRefill);
