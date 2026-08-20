@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.2 - 2026-08-20
+
+### Fixed
+
+- Fixed dump-to-container actions transferring hotbar items instead of leaving the hotbar untouched.
+
 ## 1.2.1 - 2026-08-13
 
 ### Added

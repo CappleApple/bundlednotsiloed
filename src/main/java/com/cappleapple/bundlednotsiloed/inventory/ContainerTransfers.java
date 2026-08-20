@@ -20,6 +20,7 @@ import net.neoforged.neoforge.items.ItemHandlerHelper;
 
 /** Server-authoritative bulk and browser transfers through native menu or item-handler semantics. */
 public final class ContainerTransfers {
+    private static final int MAIN_GRID_START = 9;
     private static final int MAX_WORLD_STACK_OPERATIONS = 65_536;
     private static final ThreadLocal<java.util.UUID> BULK_BACKEND_PLAYER = new ThreadLocal<>();
 
@@ -96,14 +97,14 @@ public final class ContainerTransfers {
         if (ranges.isEmpty()) return List.of();
         DynamicCapacityInventory inventory = player.getData(ModAttachments.PLAYER_DATA).inventory();
         TransferAccumulator moved = new TransferAccumulator();
-        for (ItemStack owned : inventory.backingStacks()) {
+        for (ItemStack owned : dumpableStacks(inventory)) {
             if (owned.isEmpty()) continue;
             ItemStack moving = owned.copy();
             int before = moving.getCount();
             moveThroughRanges(player.containerMenu, moving, ranges);
             int accepted = before - moving.getCount();
             if (accepted <= 0) continue;
-            inventory.extract(owned, accepted, false);
+            extractDumpedStack(inventory, owned, accepted);
             moved.add(owned, accepted);
         }
         player.containerMenu.broadcastChanges();
@@ -137,15 +138,29 @@ public final class ContainerTransfers {
         if (handler == null) return List.of();
         DynamicCapacityInventory inventory = player.getData(ModAttachments.PLAYER_DATA).inventory();
         TransferAccumulator moved = new TransferAccumulator();
-        for (ItemStack owned : inventory.backingStacks()) {
+        for (ItemStack owned : dumpableStacks(inventory)) {
             if (owned.isEmpty()) continue;
             ItemStack remainder = ItemHandlerHelper.insertItemStacked(handler, owned.copy(), false);
             int accepted = owned.getCount() - remainder.getCount();
             if (accepted <= 0) continue;
-            inventory.extract(owned, accepted, false);
+            extractDumpedStack(inventory, owned, accepted);
             moved.add(owned, accepted);
         }
         return moved.values();
+    }
+
+    /** The dump action includes the main grid and stowed backend, but never the hotbar. */
+    static List<ItemStack> dumpableStacks(DynamicCapacityInventory inventory) {
+        ArrayList<ItemStack> result = new ArrayList<>();
+        for (int slot = MAIN_GRID_START; slot < inventory.syntheticSlotCount(); slot++) {
+            ItemStack stack = inventory.syntheticStack(slot);
+            if (!stack.isEmpty()) result.add(stack);
+        }
+        return List.copyOf(result);
+    }
+
+    static void extractDumpedStack(DynamicCapacityInventory inventory, ItemStack prototype, int amount) {
+        inventory.extractAtOrAfter(prototype, amount, MAIN_GRID_START, false);
     }
 
     private static List<TransferredStack> moveLookedAtToPlayer(ServerPlayer player) {
