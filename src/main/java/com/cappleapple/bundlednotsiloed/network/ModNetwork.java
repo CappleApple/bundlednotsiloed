@@ -6,6 +6,7 @@ import com.cappleapple.bundlednotsiloed.data.PlayerInventoryData;
 import com.cappleapple.stacksnotslots.api.inventory.DynamicCapacityInventory;
 import com.cappleapple.bundlednotsiloed.client.ClientTransientState;
 import com.cappleapple.bundlednotsiloed.client.ClientSaveState;
+import com.cappleapple.bundlednotsiloed.client.CreativeInventoryCursor;
 import com.cappleapple.bundlednotsiloed.category.CategoryDefinition;
 import com.cappleapple.bundlednotsiloed.category.CategoryPresetManager;
 import com.cappleapple.bundlednotsiloed.category.CategoryRule;
@@ -19,6 +20,7 @@ import com.cappleapple.bundlednotsiloed.hotbar.HotbarBindings;
 import com.cappleapple.bundlednotsiloed.config.ClientConfig;
 import com.cappleapple.bundlednotsiloed.category.SortMode;
 import com.cappleapple.bundlednotsiloed.inventory.InventoryTransactions;
+import com.cappleapple.bundlednotsiloed.inventory.InventoryCursorTransactions;
 import com.cappleapple.bundlednotsiloed.inventory.ContainerTransfers;
 import net.minecraft.network.chat.Component;
 import net.minecraft.nbt.Tag;
@@ -59,13 +61,16 @@ public final class ModNetwork {
     private ModNetwork() {}
 
     public static void registerPayloads(RegisterPayloadHandlersEvent event) {
-        var registrar = event.registrar("9");
+        var registrar = event.registrar("10");
         registrar.playToClient(InventorySnapshotPayload.TYPE, InventorySnapshotPayload.STREAM_CODEC, ModNetwork::receiveSnapshot);
         registrar.playToClient(InventoryDeltaPayload.TYPE, InventoryDeltaPayload.STREAM_CODEC, ModNetwork::receiveDelta);
         registrar.playToClient(PlayerMetadataPayload.TYPE, PlayerMetadataPayload.STREAM_CODEC, ModNetwork::receiveMetadata);
         registrar.playToServer(PlayerCustomizationPayload.TYPE, PlayerCustomizationPayload.STREAM_CODEC, ModNetwork::updatePlayerCustomization);
         registrar.playToServer(RequestFullSyncPayload.TYPE, RequestFullSyncPayload.STREAM_CODEC, ModNetwork::requestFullSync);
         registrar.playToServer(InventoryActionPayload.TYPE, InventoryActionPayload.STREAM_CODEC, ModNetwork::inventoryAction);
+        registrar.playToServer(CreativeInventoryStowPayload.TYPE, CreativeInventoryStowPayload.STREAM_CODEC, ModNetwork::stowCreativeInventoryCursor);
+        registrar.playToServer(CreativeInventoryTakePayload.TYPE, CreativeInventoryTakePayload.STREAM_CODEC, ModNetwork::takeCreativeInventoryCursor);
+        registrar.playToClient(CreativeInventoryCursorPayload.TYPE, CreativeInventoryCursorPayload.STREAM_CODEC, ModNetwork::receiveCreativeInventoryCursor);
         registrar.playToServer(HotbarCyclePayload.TYPE, HotbarCyclePayload.STREAM_CODEC, ModNetwork::cycleHotbar);
         registrar.playToClient(HotbarCycleResultPayload.TYPE, HotbarCycleResultPayload.STREAM_CODEC, ModNetwork::cycleHotbarResult);
         registrar.playToServer(CategoryEditPayload.TYPE, CategoryEditPayload.STREAM_CODEC, ModNetwork::editCategory);
@@ -73,6 +78,7 @@ public final class ModNetwork {
         registrar.playToServer(InventoryViewPreferencesPayload.TYPE, InventoryViewPreferencesPayload.STREAM_CODEC, ModNetwork::updateViewPreferences);
         registrar.playToServer(StowSlotPayload.TYPE, StowSlotPayload.STREAM_CODEC, ModNetwork::stowSlot);
         registrar.playToServer(StowMainGridPayload.TYPE, StowMainGridPayload.STREAM_CODEC, ModNetwork::stowMainGrid);
+        registrar.playToServer(ClearCreativeInventoryPayload.TYPE, ClearCreativeInventoryPayload.STREAM_CODEC, ModNetwork::clearCreativeInventory);
         registrar.playToServer(NewItemDestinationPayload.TYPE, NewItemDestinationPayload.STREAM_CODEC, ModNetwork::updateNewItemDestination);
         registrar.playToServer(AutoRefillPayload.TYPE, AutoRefillPayload.STREAM_CODEC, ModNetwork::updateAutoRefill);
         registrar.playToServer(RecipeTransferPayload.TYPE, RecipeTransferPayload.STREAM_CODEC, ModNetwork::transferRecipe);
@@ -248,12 +254,11 @@ public final class ModNetwork {
                 if (!carried.isEmpty() && !ItemStack.isSameItemSameComponents(carried, prototype)) return;
                 int space = carried.isEmpty() ? prototype.getMaxStackSize() : carried.getMaxStackSize() - carried.getCount();
                 if (space <= 0) return;
-                int available = inventory.extractAtOrAfter(prototype, space, 36, true).extractedAmount();
-                amount = payload.action() == InventoryActionPayload.Action.TAKE_HALF ? Math.max(1, Math.ceilDiv(available, 2)) : available;
-                ExtractionResult extraction = inventory.extractAtOrAfter(prototype, amount, 36, false);
-                if (extraction.extractedAmount() == 0) return;
-                if (carried.isEmpty()) player.containerMenu.setCarried(prototype.copyWithCount(extraction.extractedAmount()));
-                else carried.grow(extraction.extractedAmount());
+                ItemStack extracted = InventoryCursorTransactions.takeFromBackend(
+                        inventory, prototype, space, payload.action() == InventoryActionPayload.Action.TAKE_HALF);
+                if (extracted.isEmpty()) return;
+                if (carried.isEmpty()) player.containerMenu.setCarried(extracted);
+                else carried.grow(extracted.getCount());
                 player.containerMenu.broadcastChanges();
                 return;
             }
@@ -360,6 +365,33 @@ public final class ModNetwork {
         player.containerMenu.broadcastChanges();
     }
 
+    private static void stowCreativeInventoryCursor(CreativeInventoryStowPayload payload, IPayloadContext context) {
+        if (!(context.player() instanceof ServerPlayer player) || !player.gameMode.isCreative() || !allowAction(player)) return;
+        ItemStack carried = payload.carried();
+        if (carried.isEmpty() || carried.getCount() > carried.getMaxStackSize()
+                || !carried.isItemEnabled(player.level().enabledFeatures())) return;
+        var insertion = InventoryTransactions.insertIntoBackend(player, carried, false);
+        PacketDistributor.sendToPlayer(player, new CreativeInventoryCursorPayload(insertion.remainder()));
+        player.inventoryMenu.broadcastChanges();
+    }
+
+    private static void takeCreativeInventoryCursor(CreativeInventoryTakePayload payload, IPayloadContext context) {
+        if (!(context.player() instanceof ServerPlayer player) || !player.gameMode.isCreative() || !allowAction(player)) return;
+        ItemStack prototype = payload.prototype();
+        ItemStack extracted = InventoryCursorTransactions.takeFromBackend(
+                player.getData(ModAttachments.PLAYER_DATA).inventory(),
+                prototype,
+                prototype.getMaxStackSize(),
+                payload.takeHalf());
+        if (extracted.isEmpty()) return;
+        PacketDistributor.sendToPlayer(player, new CreativeInventoryCursorPayload(extracted));
+        player.inventoryMenu.broadcastChanges();
+    }
+
+    private static void receiveCreativeInventoryCursor(CreativeInventoryCursorPayload payload, IPayloadContext context) {
+        CreativeInventoryCursor.replace(payload.carried());
+    }
+
     private static void updateNewItemDestination(NewItemDestinationPayload payload, IPayloadContext context) {
         if (!(context.player() instanceof ServerPlayer player) || !allowAction(player)) return;
         PlayerInventoryData data = player.getData(ModAttachments.PLAYER_DATA);
@@ -382,6 +414,12 @@ public final class ModNetwork {
     private static void stowMainGrid(StowMainGridPayload payload, IPayloadContext context) {
         if (!(context.player() instanceof ServerPlayer player) || !allowAction(player)) return;
         if (player.getData(ModAttachments.PLAYER_DATA).inventory().stowMainGrid()) player.containerMenu.broadcastChanges();
+    }
+
+    private static void clearCreativeInventory(ClearCreativeInventoryPayload payload, IPayloadContext context) {
+        if (!(context.player() instanceof ServerPlayer player) || !player.gameMode.isCreative() || !allowAction(player)) return;
+        player.getData(ModAttachments.PLAYER_DATA).inventory().clear();
+        player.inventoryMenu.broadcastChanges();
     }
 
     private static void transferBrowserEntry(BrowserTransferPayload payload, IPayloadContext context) {

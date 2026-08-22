@@ -7,12 +7,14 @@ Minecraft 1.21.1 assumes 36 player item indices in menus and several direct code
 The mixin activates only after the one-time vanilla inventory migration marker is set.
 
 - `getItem`, `getSelected`, `setItem`, and removal methods map vanilla indices 0–35 to stable sparse backing positions.
+- `setPickedItem` and `pickSlot` replace vanilla's direct `Inventory#items` writes so creative pick block and survival pick-item swaps update logical storage instead of creating client-only ghosts.
+- Creative players bypass capacity-based slot limits. Browser stow/take actions explicitly synchronize the cursor owned by the creative screen's client-only menu, while shift-clicking the creative trash slot sends an authorized request to clear hidden storage as well as vanilla menu slots.
 - both `add` overloads call the centralized capacity transaction; pickup, commands, rewards, trading, crafting remainders, and most modded vanilla-style insertion therefore share one enforcement path.
 - `getFreeSlot`, stack matching, and remaining-space queries describe only the projection and never define logical carrying capacity.
 - `tick` ticks every actual backing stack; changes made through a live held-item reference are reconciled by identity/count hash.
 - `fillStackedContents` accounts for the complete logical collection for recipe matching.
 - `dropAll` drains and drops the complete logical collection. Armor/offhand continue through vanilla.
-- `clearContent` clears logical ownership without affecting category/hotbar metadata.
+- `clearContent` clears logical ownership without affecting category/hotbar metadata, and targeted `/clear` operations continue past the 36-slot compatibility view into every matching backend stack.
 
 The mixin deliberately leaves `getContainerSize()` at 41 so vanilla armor indices 36–39 and offhand index 40 do not shift as the collection grows.
 

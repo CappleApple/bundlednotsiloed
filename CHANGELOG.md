@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.3 - 2026-08-22
+
+### Fixed
+
+- `/clear` now applies its item filter and count across the complete logical player inventory, including stowed storage.
+- Creative pick block and creative inventory slot edits now update authoritative logical storage instead of creating ghost items.
+- Creative inventory browser actions now stow the mouse-held stack and place extracted stowed items directly on the creative cursor.
+- Mouse-held stack amounts now retain their normal white text while rendering above inventory browser panels.
+
 ## 1.2.2 - 2026-08-20
 
 ### Fixed

@@ -5,6 +5,7 @@ import com.cappleapple.bundlednotsiloed.data.ModAttachments;
 import com.cappleapple.bundlednotsiloed.data.PlayerInventoryData;
 import com.cappleapple.stacksnotslots.api.inventory.DynamicCapacityInventory;
 import com.cappleapple.bundlednotsiloed.inventory.InsertionContext;
+import com.cappleapple.bundlednotsiloed.inventory.InventoryClearing;
 import com.cappleapple.bundlednotsiloed.inventory.InventoryTransactions;
 import com.cappleapple.bundlednotsiloed.inventory.VisibleStackRefill;
 import java.util.List;
@@ -12,6 +13,7 @@ import java.util.function.Predicate;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.tags.TagKey;
+import net.minecraft.world.Container;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.player.StackedContents;
@@ -65,6 +67,49 @@ public abstract class InventoryMixin {
     @Inject(method = "getSelected", at = @At("HEAD"), cancellable = true)
     private void sns$getSelected(CallbackInfoReturnable<ItemStack> callback) {
         if (sns$active()) callback.setReturnValue(sns$data().inventory().vanillaStackReference(sns$logicalIndex(((Inventory)(Object)this).selected)));
+    }
+
+    /** Vanilla writes Inventory#items directly for pick block; keep that operation authoritative. */
+    @Inject(method = "setPickedItem", at = @At("HEAD"), cancellable = true)
+    private void sns$setPickedItem(ItemStack stack, CallbackInfo callback) {
+        if (!sns$active()) return;
+        Inventory self = (Inventory)(Object)this;
+        DynamicCapacityInventory inventory = sns$data().inventory();
+        int matchingSlot = self.findSlotMatchingItem(stack);
+        if (Inventory.isHotbarSlot(matchingSlot)) {
+            self.selected = matchingSlot;
+        } else if (matchingSlot >= 0) {
+            sns$pickLogicalSlot(matchingSlot);
+        } else {
+            self.selected = self.getSuitableHotbarSlot();
+            ItemStack replaced = inventory.syntheticStack(self.selected);
+            if (!replaced.isEmpty()) {
+                int freeSlot = self.getFreeSlot();
+                if (freeSlot >= 0) inventory.replaceSyntheticSlotFromItemUse(freeSlot, replaced);
+            }
+            inventory.replaceSyntheticSlotFromItemUse(self.selected, stack);
+        }
+        callback.cancel();
+    }
+
+    /** Vanilla's survival pick-item swap has the same direct-list behavior as creative pick block. */
+    @Inject(method = "pickSlot", at = @At("HEAD"), cancellable = true)
+    private void sns$pickSlot(int slot, CallbackInfo callback) {
+        if (!sns$active() || slot < 0 || slot >= Inventory.INVENTORY_SIZE) return;
+        sns$pickLogicalSlot(slot);
+        callback.cancel();
+    }
+
+    @Unique
+    private void sns$pickLogicalSlot(int slot) {
+        Inventory self = (Inventory)(Object)this;
+        DynamicCapacityInventory inventory = sns$data().inventory();
+        int selectedSlot = self.getSuitableHotbarSlot();
+        ItemStack selectedStack = inventory.syntheticStack(selectedSlot);
+        ItemStack pickedStack = inventory.syntheticStack(slot);
+        self.selected = selectedSlot;
+        inventory.replaceSyntheticSlotFromItemUse(selectedSlot, pickedStack);
+        inventory.replaceSyntheticSlotFromItemUse(slot, selectedStack);
     }
 
     @Inject(method = "setItem", at = @At("HEAD"), cancellable = true)
@@ -231,6 +276,25 @@ public abstract class InventoryMixin {
     @Inject(method = "clearContent", at = @At("HEAD"))
     private void sns$clear(CallbackInfo callback) {
         if (sns$active()) sns$data().inventory().clear();
+    }
+
+    /** Vanilla already handles visible, equipment, crafting, and carried stacks; append hidden storage. */
+    @Inject(method = "clearOrCountMatchingItems", at = @At("RETURN"), cancellable = true)
+    private void sns$clearOrCountHiddenItems(
+            Predicate<ItemStack> predicate,
+            int maxCount,
+            Container craftingSlots,
+            CallbackInfoReturnable<Integer> callback
+    ) {
+        if (!sns$active()) return;
+        DynamicCapacityInventory inventory = sns$data().inventory();
+        inventory.reconcileExternalMutations();
+        int vanillaAffected = callback.getReturnValue();
+        if (maxCount > 0 && vanillaAffected >= maxCount) return;
+        int backendLimit = maxCount > 0 ? maxCount - vanillaAffected : maxCount;
+        int hiddenAffected = InventoryClearing.clearOrCountMatchingItems(
+                inventory, predicate, backendLimit, Inventory.INVENTORY_SIZE);
+        callback.setReturnValue((int)Math.min(Integer.MAX_VALUE, (long)vanillaAffected + hiddenAffected));
     }
 
     @Inject(method = "fillStackedContents", at = @At("HEAD"), cancellable = true)

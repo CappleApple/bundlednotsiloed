@@ -28,6 +28,7 @@ public abstract class SlotMixin {
         if (!(container instanceof Inventory playerInventory)) return;
         var data = playerInventory.player.getData(ModAttachments.PLAYER_DATA);
         if (!data.migratedVanillaInventory() || slot < 0 || slot >= Inventory.INVENTORY_SIZE || incoming.isEmpty()) return;
+        if (playerInventory.player.hasInfiniteMaterials()) return;
         DynamicCapacityInventory inventory = data.inventory();
         ItemStack existing = playerInventory.getItem(slot);
         CapacityAmount replaceableCapacity = inventory.exactRemainingCapacity();

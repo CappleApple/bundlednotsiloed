@@ -110,6 +110,36 @@ class InventoryPayloadCodecTest {
     }
 
     @Test
+    void creativeCursorTransactionsRoundTripFullAndEmptyStacks() {
+        RegistryFriendlyByteBuf buffer = createBuffer();
+        try {
+            CreativeInventoryStowPayload.STREAM_CODEC.encode(
+                    buffer, new CreativeInventoryStowPayload(new ItemStack(Items.STONE, 37)));
+            CreativeInventoryTakePayload.STREAM_CODEC.encode(
+                    buffer, new CreativeInventoryTakePayload(true, new ItemStack(Items.DIAMOND, 12)));
+            CreativeInventoryCursorPayload.STREAM_CODEC.encode(
+                    buffer, new CreativeInventoryCursorPayload(ItemStack.EMPTY));
+            CreativeInventoryCursorPayload.STREAM_CODEC.encode(
+                    buffer, new CreativeInventoryCursorPayload(new ItemStack(Items.DIRT, 5)));
+            buffer.readerIndex(0);
+
+            ItemStack stowed = CreativeInventoryStowPayload.STREAM_CODEC.decode(buffer).carried();
+            assertSame(Items.STONE, stowed.getItem());
+            assertEquals(37, stowed.getCount());
+            CreativeInventoryTakePayload take = CreativeInventoryTakePayload.STREAM_CODEC.decode(buffer);
+            assertTrue(take.takeHalf());
+            assertSame(Items.DIAMOND, take.prototype().getItem());
+            assertEquals(1, take.prototype().getCount());
+            assertTrue(CreativeInventoryCursorPayload.STREAM_CODEC.decode(buffer).carried().isEmpty());
+            ItemStack returned = CreativeInventoryCursorPayload.STREAM_CODEC.decode(buffer).carried();
+            assertSame(Items.DIRT, returned.getItem());
+            assertEquals(5, returned.getCount());
+        } finally {
+            buffer.release();
+        }
+    }
+
+    @Test
     void browserTransferIdentityRoundTripsWithoutQuantity() {
         RegistryFriendlyByteBuf buffer = createBuffer();
         try {

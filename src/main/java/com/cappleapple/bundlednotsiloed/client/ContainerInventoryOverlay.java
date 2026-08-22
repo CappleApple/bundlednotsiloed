@@ -14,6 +14,8 @@ import com.cappleapple.bundlednotsiloed.data.ModAttachments;
 import com.cappleapple.bundlednotsiloed.network.BrowserStatePayload;
 import com.cappleapple.bundlednotsiloed.network.BrowserTransferPayload;
 import com.cappleapple.bundlednotsiloed.network.BulkTransferPayload;
+import com.cappleapple.bundlednotsiloed.network.CreativeInventoryStowPayload;
+import com.cappleapple.bundlednotsiloed.network.CreativeInventoryTakePayload;
 import com.cappleapple.bundlednotsiloed.network.InventoryActionPayload;
 import com.cappleapple.bundlednotsiloed.network.InventoryViewPreferencesPayload;
 import com.cappleapple.bundlednotsiloed.network.StowMainGridPayload;
@@ -34,6 +36,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
@@ -386,20 +389,33 @@ public final class ContainerInventoryOverlay {
 
         if (inside(mouseX, mouseY, layout.contentX(), layout.contentY(), layout.contentWidth(), layout.contentHeight())
                 && (button == 0 || button == 1)
-                && !Minecraft.getInstance().player.containerMenu.getCarried().isEmpty()) {
+                && !screen.getMenu().getCarried().isEmpty()) {
             if (InventoryFullFeedback.cursorCannotFit()) InventoryFullFeedback.playSound();
-            PacketDistributor.sendToServer(new StowSlotPayload(-1));
+            stowCarried(screen, screen.getMenu().getCarried());
             return true;
         }
         LogicalInventoryEntry entry = entryAt(screen, mouseX, mouseY);
         if (entry != null && (button == 0 || button == 1)) {
-            ItemStack carried = Minecraft.getInstance().player.containerMenu.getCarried();
-            if (!carried.isEmpty()) PacketDistributor.sendToServer(new StowSlotPayload(-1));
+            ItemStack carried = screen.getMenu().getCarried();
+            if (!carried.isEmpty()) stowCarried(screen, carried);
             else if (Screen.hasShiftDown()) PacketDistributor.sendToServer(new BrowserTransferPayload(entry.representative()));
-            else PacketDistributor.sendToServer(new InventoryActionPayload(button == 1
-                    ? InventoryActionPayload.Action.TAKE_HALF : InventoryActionPayload.Action.TAKE_STACK, entry.representative()));
+            else if (screen instanceof CreativeModeInventoryScreen) {
+                PacketDistributor.sendToServer(new CreativeInventoryTakePayload(button == 1, entry.representative()));
+            } else {
+                PacketDistributor.sendToServer(new InventoryActionPayload(button == 1
+                        ? InventoryActionPayload.Action.TAKE_HALF : InventoryActionPayload.Action.TAKE_STACK,
+                        entry.representative()));
+            }
         }
         return true;
+    }
+
+    private static void stowCarried(AbstractContainerScreen<?> screen, ItemStack carried) {
+        if (screen instanceof CreativeModeInventoryScreen) {
+            PacketDistributor.sendToServer(new CreativeInventoryStowPayload(carried));
+        } else {
+            PacketDistributor.sendToServer(new StowSlotPayload(-1));
+        }
     }
 
     private static boolean mouseScrolledContent(AbstractContainerScreen<?> screen, double mouseX, double mouseY, double deltaY) {
