@@ -22,6 +22,8 @@ import com.cappleapple.bundlednotsiloed.category.SortMode;
 import com.cappleapple.bundlednotsiloed.inventory.InventoryTransactions;
 import com.cappleapple.bundlednotsiloed.inventory.InventoryCursorTransactions;
 import com.cappleapple.bundlednotsiloed.inventory.ContainerTransfers;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
@@ -197,11 +199,17 @@ public final class ModNetwork {
             return;
         }
         PlayerInventoryData data = player.getData(ModAttachments.PLAYER_DATA);
-        data.loadCustomization(player.registryAccess(), payload.data());
-        CategoryPresetManager.upgradeLegacyDefaults(data.categories());
-        InventoryProjection.applyExplicitView(data);
+        restorePlayerCustomization(data, player.registryAccess(), payload.data());
         sendMetadata(player);
         player.inventoryMenu.broadcastChanges();
+    }
+
+    /** Restores client-owned preferences without replaying the one-shot visible-inventory arrangement. */
+    static void restorePlayerCustomization(
+            PlayerInventoryData data, HolderLookup.Provider provider, CompoundTag customization
+    ) {
+        data.loadCustomization(provider, customization);
+        CategoryPresetManager.upgradeLegacyDefaults(data.categories());
     }
 
     private static boolean validCustomization(net.minecraft.nbt.CompoundTag root, ServerPlayer player) {

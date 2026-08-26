@@ -7,6 +7,7 @@ import com.cappleapple.stacksnotslots.api.inventory.DynamicCapacityInventory;
 import com.cappleapple.bundlednotsiloed.inventory.InsertionContext;
 import com.cappleapple.bundlednotsiloed.inventory.InventoryClearing;
 import com.cappleapple.bundlednotsiloed.inventory.InventoryTransactions;
+import com.cappleapple.bundlednotsiloed.inventory.VanillaEquipmentInventoryTicks;
 import com.cappleapple.bundlednotsiloed.inventory.VisibleStackRefill;
 import java.util.List;
 import java.util.function.Predicate;
@@ -261,6 +262,7 @@ public abstract class InventoryMixin {
         if (!sns$active()) return;
         sns$data().reconcileVanillaCompatibilityView();
         sns$data().inventory().tick(player);
+        VanillaEquipmentInventoryTicks.tick(player);
         if (!player.level().isClientSide && sns$data().autoRefill()
                 && VisibleStackRefill.refill(sns$data().inventory())) {
             player.containerMenu.broadcastChanges();

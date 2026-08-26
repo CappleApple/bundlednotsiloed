@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2.5 - 2026-08-26
+
+### Fixed
+
+- Armor and offhand items now keep receiving vanilla inventory ticks, preventing their slot pop animation from shaking and stretching indefinitely after a hand swap.
+
+## 1.2.4 - 2026-08-26
+
+### Fixed
+
+- The simulated vanilla inventory now preserves its visible slot arrangement when leaving and rejoining a world.
+
 ## 1.2.3 - 2026-08-22
 
 ### Fixed

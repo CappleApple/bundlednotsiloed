@@ -28,6 +28,9 @@ public final class ServerEvents {
         PlayerInventoryData data = player.getData(ModAttachments.PLAYER_DATA);
         initializeCapacityBase(player, data);
         migrateVanillaInventory(player, data);
+        // Attachment and vanilla inventory load order must not decide which first-36 view wins.
+        // Republish the persisted logical positions after the player is fully loaded.
+        data.syncVanillaCompatibilityView();
         CategoryPresetManager.initialize(data.categories());
         CategoryPresetManager.upgradeLegacyDefaults(data.categories());
         ModNetwork.sendInitial(player);
