@@ -2,6 +2,7 @@ package com.cappleapple.bundlednotsiloed.network;
 
 import com.cappleapple.bundlednotsiloed.BundledNotSiloed;
 import com.cappleapple.bundlednotsiloed.data.ModAttachments;
+import com.cappleapple.bundlednotsiloed.data.InventorySlotWindow;
 import com.cappleapple.bundlednotsiloed.data.PlayerInventoryData;
 import com.cappleapple.stacksnotslots.api.inventory.DynamicCapacityInventory;
 import com.cappleapple.bundlednotsiloed.client.ClientTransientState;
@@ -63,7 +64,7 @@ public final class ModNetwork {
     private ModNetwork() {}
 
     public static void registerPayloads(RegisterPayloadHandlersEvent event) {
-        var registrar = event.registrar("10");
+        var registrar = event.registrar("11");
         registrar.playToClient(InventorySnapshotPayload.TYPE, InventorySnapshotPayload.STREAM_CODEC, ModNetwork::receiveSnapshot);
         registrar.playToClient(InventoryDeltaPayload.TYPE, InventoryDeltaPayload.STREAM_CODEC, ModNetwork::receiveDelta);
         registrar.playToClient(PlayerMetadataPayload.TYPE, PlayerMetadataPayload.STREAM_CODEC, ModNetwork::receiveMetadata);
@@ -78,6 +79,7 @@ public final class ModNetwork {
         registrar.playToServer(CategoryEditPayload.TYPE, CategoryEditPayload.STREAM_CODEC, ModNetwork::editCategory);
         registrar.playToServer(HotbarBindPayload.TYPE, HotbarBindPayload.STREAM_CODEC, ModNetwork::bindHotbar);
         registrar.playToServer(InventoryViewPreferencesPayload.TYPE, InventoryViewPreferencesPayload.STREAM_CODEC, ModNetwork::updateViewPreferences);
+        registrar.playToServer(InventoryWindowPayload.TYPE, InventoryWindowPayload.STREAM_CODEC, ModNetwork::updateInventoryWindow);
         registrar.playToServer(StowSlotPayload.TYPE, StowSlotPayload.STREAM_CODEC, ModNetwork::stowSlot);
         registrar.playToServer(StowMainGridPayload.TYPE, StowMainGridPayload.STREAM_CODEC, ModNetwork::stowMainGrid);
         registrar.playToServer(ClearCreativeInventoryPayload.TYPE, ClearCreativeInventoryPayload.STREAM_CODEC, ModNetwork::clearCreativeInventory);
@@ -253,6 +255,7 @@ public final class ModNetwork {
         if (!(context.player() instanceof ServerPlayer player) || !allowAction(player)) return;
         DynamicCapacityInventory inventory = player.getData(ModAttachments.PLAYER_DATA).inventory();
         ItemStack prototype = payload.prototype();
+        int firstBrowserSlot = isBrowserOpen(player) ? 9 : 36;
         int amount;
         switch (payload.action()) {
             case DROP_ONE -> amount = 1;
@@ -262,8 +265,9 @@ public final class ModNetwork {
                 if (!carried.isEmpty() && !ItemStack.isSameItemSameComponents(carried, prototype)) return;
                 int space = carried.isEmpty() ? prototype.getMaxStackSize() : carried.getMaxStackSize() - carried.getCount();
                 if (space <= 0) return;
-                ItemStack extracted = InventoryCursorTransactions.takeFromBackend(
-                        inventory, prototype, space, payload.action() == InventoryActionPayload.Action.TAKE_HALF);
+                ItemStack extracted = InventoryCursorTransactions.takeFromRange(
+                        inventory, prototype, space, payload.action() == InventoryActionPayload.Action.TAKE_HALF,
+                        firstBrowserSlot);
                 if (extracted.isEmpty()) return;
                 if (carried.isEmpty()) player.containerMenu.setCarried(extracted);
                 else carried.grow(extracted.getCount());
@@ -272,7 +276,7 @@ public final class ModNetwork {
             }
             default -> throw new IllegalStateException("Unhandled inventory action");
         }
-        ExtractionResult extraction = inventory.extractAtOrAfter(prototype, amount, 36, false);
+        ExtractionResult extraction = inventory.extractAtOrAfter(prototype, amount, firstBrowserSlot, false);
         extraction.extractedStacks().forEach(stack -> player.drop(stack, false));
     }
 
@@ -355,6 +359,20 @@ public final class ModNetwork {
         player.inventoryMenu.broadcastChanges();
     }
 
+    private static void updateInventoryWindow(InventoryWindowPayload payload, IPayloadContext context) {
+        if (!(context.player() instanceof ServerPlayer player) || !allowAction(player)
+                || !isBrowserOpen(player)) return;
+        PlayerInventoryData data = player.getData(ModAttachments.PLAYER_DATA);
+        if (payload.mode() == InventoryWindowPayload.Mode.RANGE) {
+            if (payload.firstLogicalSlot() > InventorySlotWindow.maximumRangeStart(
+                    data.inventory().syntheticSlotCount())) return;
+            data.showInventoryRange(payload.firstLogicalSlot());
+        } else {
+            data.showInventoryWindow(payload.prototypes());
+        }
+        player.containerMenu.broadcastChanges();
+    }
+
     private static void stowSlot(StowSlotPayload payload, IPayloadContext context) {
         if (!(context.player() instanceof ServerPlayer player) || !allowAction(player)
                 || payload.slot() < -1 || payload.slot() >= 36) return;
@@ -432,13 +450,17 @@ public final class ModNetwork {
 
     private static void transferBrowserEntry(BrowserTransferPayload payload, IPayloadContext context) {
         if (!(context.player() instanceof ServerPlayer player) || !allowAction(player)) return;
-        ContainerTransfers.moveBackendEntryToMenu(player, payload.prototype());
+        ContainerTransfers.moveBrowserEntryToMenu(player, payload.prototype(), payload.mode());
     }
 
     private static void browserState(BrowserStatePayload payload, IPayloadContext context) {
         if (!(context.player() instanceof ServerPlayer player) || !allowAction(player)) return;
         if (payload.open()) OPEN_BROWSERS.add(player.getUUID());
-        else OPEN_BROWSERS.remove(player.getUUID());
+        else {
+            OPEN_BROWSERS.remove(player.getUUID());
+            player.getData(ModAttachments.PLAYER_DATA).resetInventoryWindow();
+            player.containerMenu.broadcastChanges();
+        }
     }
 
     private static void bulkTransfer(BulkTransferPayload payload, IPayloadContext context) {

@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.3 - 2026-08-31
+
+### Added
+
+- Added a native-texture inventory-screen replacement with a compact separator containing search, category, and settings controls.
+- Added a fixed 27-cell logical inventory window with conditional row scrolling and a scrollbar that appears only when more rows are available.
+- Added conservative vanilla and modded container-screen integration for standard 9-by-3 player main-inventory grids, including an in-margin search/category/settings toolbar and conditional scrollbar.
+- Added expandable category and settings menus; categories can also be changed by scrolling over their button.
+- Added a muted green/orange/red capacity fill behind every integrated search field, with current/maximum stack capacity on normal hover and three-line search help while Shift is held.
+- Added a synchronized real-slot viewport: the menu's 27 vanilla player-main slots map onto additional logical inventory rows as needed while retaining native slot interaction paths.
+- Added asymmetric player-to-container transfer controls: Shift-left moves one legal stack through the active menu, while Shift-right moves as much matching quantity as that menu can accept.
+- Added Shift-click on the category selector to move the main 27 inventory slots into stowed storage while leaving the hotbar unchanged; holding Shift changes the selector icon to a sticky piston and reveals its cleanup tooltip.
+
+### Changed
+
+- Search combines exact item-and-component identities from player main storage and the dynamic backend into one displayed quantity; category and sort actions keep the native real-slot grid.
+- The vanilla player profile, crafting area, armor, offhand, recipe-book control, and hotbar remain in the familiar native layout while the main inventory shifts downward.
+- Replaced the floating Panels Not Screens browser and removed that project dependency.
+- Category and sort controls now apply a one-shot arrangement without rearranging the hotbar; subsequent manual slot placement remains under the player's control and persists.
+- Category and settings controls use compact 13-pixel Minecraft button textures, while icons in their expanded menus render at the full 16-pixel item size.
+- The manual inventory view always retains all 27 vanilla main-grid cells, including empty placement cells, and adds nine-cell scroll rows only when storage extends beyond them.
+- Quantity sort labels now read `1-9` and `9-1`.
+
+### Fixed
+
+- Fixed the real All category being accompanied by a second synthetic All entry and being visited twice when scrolling categories.
+- Fixed expanded category and settings menu icons rendering beneath container inventory items.
+- Fixed the integrated container overlay consuming Shift-clicks instead of preserving the active menu's native transfer behavior.
+- Fixed category and sort selection temporarily using custom-rendered entries with small counts, missing durability bars, and a scrollbar sized only to the selected category.
+- Fixed category results staying stale when saved tabs arrived after the inventory-entry cache was populated.
+- Fixed clicking an already-open category or settings button reopening its menu instead of closing it.
+
 ## 1.2.5 - 2026-08-26
 
 ### Fixed

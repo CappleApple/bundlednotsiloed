@@ -1,6 +1,6 @@
 # Bundled Not Siloed
 
-Bundled Not Siloed is the player-facing NeoForge 1.21.1 inventory overhaul. It uses **Stacks Not Slots** for authoritative capacity storage and **Panels Not Screens** for its movable browser. The nine-position hotbar and vanilla inventory indices are access views over the logical collection; neither grants storage nor limits how many distinct entries can exist.
+Bundled Not Siloed is the player-facing NeoForge 1.21.1 inventory overhaul. It uses **Stacks Not Slots** for authoritative capacity storage and integrates its browser directly into Minecraft's inventory screens. The nine-position hotbar and vanilla inventory indices are access views over the logical collection; neither grants storage nor limits how many distinct entries can exist.
 
 The default capacity is 2,304 units: 36 stack-equivalents covering the vanilla 27-slot main grid plus 9-slot hotbar. Every complete legal stack costs exactly 64 units: a 64-stackable item costs one unit each, a 16-stackable item costs four, a non-stackable item costs 64, and a 128-stackable item costs one half. Exact rational accounting supports any positive max-stack size without floating-point drift. Capacity includes hotbar-accessed items and is controlled live by the `bundlednotsiloed:inventory_capacity` player attribute.
 
@@ -10,7 +10,7 @@ There is no hidden compatibility-slot ceiling below capacity. If a player has ca
 
 Implemented:
 
-- Independent Gradle dependencies on the local Stacks Not Slots and Panels Not Screens projects
+- Gradle dependency on the local Stacks Not Slots project
 - Dynamic logical inventory with no configured backing-slot maximum
 - Sparse, dynamically indexed compatibility slots that retain explicit placement, plus an append slot
 - Runtime capacity attribute and normal Minecraft attribute-modifier support
@@ -25,9 +25,9 @@ Implemented:
 - In-game searchable category editor and reset-to-defaults operation
 - Most-restrictive overlapping world-pickup limits and rate-limited feedback
 - Category-only hotbar cycle bindings, remembered selections, cycling keybinds, and HUD feedback
-- Vanilla-first inventory UI with a collapsed-by-default, four-direction draggable browser for search, category projection, list/grid views, configurable counts, sorting, and capacity
-- Shared topmost browser on all container screens, with input scoped to the browser so modded container controls remain usable
-- Dynamic JEI and EMI exclusion areas so their ingredient lists reflow around the moved or expanded browser
+- Native-style player inventory replacement with an integrated search toolbar, category/settings menus, a synchronized real-slot 9-by-3 viewport, and conditional row scrolling
+- Generic vanilla and modded container integration that retains the menu's standard 27 real player-main `Slot` objects and remaps them onto additional logical rows as needed
+- JEI and EMI recipe transfer integration without floating GUI exclusion areas
 - Native quick-move integration for vanilla, Mouse Tweaks-style repeated clicks, and modded container screens
 - Bulk dump/extract controls for open menus and looked-at item-handler containers, with an optional world feedback grid
 - Server-authoritative inventory/category/hotbar packets with input validation and action rate limiting
@@ -45,7 +45,7 @@ Requirements:
 - Java 21
 - Minecraft 1.21.1
 - NeoForge 21.1.244
-- sibling `../stacks-not-slots` and `../panels-not-screens` checkouts (Gradle composite builds provide the local library artifacts)
+- sibling `../stacks-not-slots` checkout (a Gradle composite build provides the local library artifact)
 
 Windows:
 
@@ -65,29 +65,28 @@ Linux/macOS:
 ./gradlew runServer
 ```
 
-The built mod is written to `build/libs/bundlednotsiloed-1.2.5.jar`. The project uses official Mojang mappings with Parchment parameter names and ModDevGradle's Minecraft-aware JUnit support.
+The built mod is written to `build/libs/bundlednotsiloed-1.3.jar`. The project uses official Mojang mappings with Parchment parameter names and ModDevGradle's Minecraft-aware JUnit support.
 
 ## Player usage
 
-Open the normal inventory to see the familiar vanilla layout. Click the spyglass handle to open the inventory browser. Drag it at least a few pixels to reposition it; its blue state shows that the browser is open. The browser can open left, right, above, or below the handle and renders above the underlying menu. Position, docking, open state, and visibility are remembered independently for each container-screen type. Control-F toggles the handle and closes an open browser. Press F to open the browser, clear its search, and begin typing a new query; while the search field is already active, F types normally.
+Open the normal inventory to see Minecraft's familiar player model, armor, crafting, recipe-book, and hotbar layout. The main-inventory section is shifted down just far enough for a compact native-style toolbar containing the search field, category button, and settings button. The normal view always exposes the complete 27-cell vanilla main grid, including empty cells, and preserves manual placement. It gains additional nine-cell scroll rows only when occupied logical storage extends past that base. Search combines exact item-and-component identities into one displayed quantity, while category and sort clicks perform one arrangement and keep the real native slots active. The hotbar remains a separate nine-position access view.
 
-- Left-click an entry to move a legal stack to the cursor.
-- Right-click an entry to move half a legal stack to the cursor.
+- Use normal left/right clicks, drag splitting, double-click collection, number keys, and compatible mod interactions on the real player slots.
+- In an opened container, Shift-left-click a player stack to let that menu transfer one legal stack. Shift-right-click to repeat the same native transfer for as much of that exact item-and-component identity as the container can accept.
 - Press the normal drop key while hovering an entry to drop one; hold Control to drop a stack.
-- Control-left-click a visible player slot to stow that stack behind the vanilla window. Clicking the browser list while carrying a stack does the same.
-- With the browser closed, shift-clicking retains normal vanilla main-grid/hotbar/equipment behavior. With it open, shift-clicking a visible player stack stows it; shift-clicking a browser entry moves one backend stack into the first free main-grid slot, or does nothing when that grid is full.
-- In another container screen, an open browser redirects container-to-player shift-clicks into backend storage while player-to-container shift-clicks keep the menu's native behavior.
-- The sticky-piston browser button extracts an open container; hold Shift to turn it into a normal piston and dump the player inventory. Control-G and Control-H perform bulk dump/extract against the open menu or the container being looked at.
-- The draggable category icon above the vanilla grid scrolls categories whether its popup is open or closed. Hold Shift to turn it into a sticky piston and stow the 27-slot main grid without touching the hotbar.
+- Scroll over the 27-cell grid to move through additional logical rows. The narrow scrollbar appears only when the inventory or active search has more than 27 visible positions.
+- Press F to clear and focus search; while the search field is already active, F types normally. Right-click the field to clear it, and Control-A selects the complete query. The search background is also a muted green/orange/red capacity bar. Hover it for current/maximum stack-equivalent capacity; hold Shift for the three-line search-syntax help.
+- Click the compact category button to open a scrollable category menu, or scroll while hovering the closed button to change categories directly. Click the open button again to close it. Hold Shift to change the selector icon to a sticky piston and reveal its cleanup hint; Shift-click then moves all occupied main-grid cells into stowed rows while leaving the hotbar unchanged. The real **All** preset is shown once, with a fallback entry only when that preset is unavailable.
+- Click the compact settings button for **Manage Tabs**, **Sort Order**, and **Settings**. The sort entry cycles the active order and also responds to the mouse wheel; quantity order is labeled **1-9** or **9-1**.
 - Use **Manage Tabs** to add/edit/delete/reorder categories, assign a cycle category independently to each of the nine hotbar positions, and choose whether pickups may enter empty hotbar slots.
-- Selecting a category or sort mode performs one explicit arrangement of the main 27-slot grid. It displays one stack per distinct matching identity; subsequent placement is fully manual until another category or sort control is clicked.
+- Selecting a category or sort mode arranges the inventory once without rearranging the hotbar. The grid remains the same 27 native player slots throughout, so normal counts, durability bars, mod interactions, scrolling through the rest of the inventory, and subsequent manual placement remain available immediately.
 - Hotbar bindings never restrict placement or rearrange items automatically. The configurable forward/backward cycle keys explicitly swap the selected position with the next owned item in its assigned category.
-- Every container screen can show the same draggable browser; take any logical entry to the cursor and place it into the container normally.
-- Right-click the search field to clear it. Control-A selects the complete query so Backspace, Delete, or newly typed text can replace it.
+- In a vanilla or modded container screen that exposes the standard 9-by-3 player main-inventory grid, those same real player slots become the combined, searchable, row-scrollable viewport. The capacity-backed search field and compact category/settings controls occupy the texture margin immediately above the player grid, its scrollbar appears only when needed, and the container's own slots and controls remain native.
+- Control-G and Control-H perform bulk dump/extract against the open menu or the item-handler container being looked at.
 
-An empty search shows the selected category. A non-empty search spans every category and matches display names and full registry IDs. Prefix with `@` for mod namespaces, `#` for item or represented-block tags, `^` for cached tooltip text, or `/` for a case-insensitive regular expression across names, IDs, namespaces, and tags. Use `^/pattern` for a tooltip regular expression. A closing slash is optional, so both `/pattern` and `/pattern/` work. Invalid regular expressions are shown in red and return no results. Search results retain the selected sort order. Category rules accept exact items, `#tags`, `@modid` namespaces, and durable `/regex` predicates; `/sword` dynamically includes every matching current or future item. Regex rules also see `block:<registry-id>` for every `BlockItem`, allowing `/^block:` to select all blocks. Tooltip searches in the category editor add the selected exact item. Sort modes cover name, quantity, registry ID, and namespace; the current sort and category selection persist with player data.
+An empty search shows the complete manually placeable inventory in its current order. A non-empty search spans every category and matches display names and full registry IDs. Prefix with `@` for mod namespaces, `#` for item or represented-block tags, `^` for cached tooltip text, or `/` for a case-insensitive regular expression across names, IDs, namespaces, and tags. Use `^/pattern` for a tooltip regular expression. A closing slash is optional, so both `/pattern` and `/pattern/` work. Invalid regular expressions are shown in red and return no results. Category rules accept exact items, `#tags`, `@modid` namespaces, and durable `/regex` predicates; `/sword` dynamically includes every matching current or future item. Regex rules also see `block:<registry-id>` for every `BlockItem`, allowing `/^block:` to select all blocks. Tooltip searches in the category editor add the selected exact item. Sort modes cover name, quantity, registry ID, and namespace. The selected category and sort preference persist with player data, but both controls are one-shot arrangement actions: later manual item placement is not continuously reordered.
 
-The browser never extends beyond the screen edge or across its handle. It reduces visible rows or columns when space is limited, while retaining at least one item row or column. Top and bottom docking use left/right control rails so the search field remains at the top and horizontal space is available to item results.
+The integrated browser always uses nine columns and three visible rows. The manual view never shrinks below 27 addressable cells and only adds scroll rows beyond them when necessary. Search filtering can remove the need to scroll; the row offset and scrollbar are clamped immediately whenever the result count changes.
 
 ## Capacity and over-capacity behavior
 
@@ -99,7 +98,7 @@ The effective limit is the floored, non-negative value of the player's `bundledn
 
 If capacity falls below current usage, no item is deleted or moved. New positive-cost insertion is rejected until enough capacity is restored or items are removed. Dropping, consuming, crafting with, and transferring items out remain valid.
 
-While the cursor holds a stack that cannot add even one item, the browser handle changes to a barrier. Empty projected player slots can also show visual-only barriers; attempting a capacity-blocked placement plays the configured client sound. Valid replacements that reclaim the occupied slot's capacity remain available.
+Empty projected player slots can show visual-only barriers while the cursor holds a stack that cannot add even one item. Attempting a capacity-blocked placement plays the configured client sound. Valid replacements that reclaim an occupied position's capacity remain available.
 
 If a committed held-item transformation produces a higher-cost result, the result is preserved and the player enters the normal over-capacity state rather than losing the item or crashing the operation.
 
@@ -127,7 +126,7 @@ Player customizations are persisted by UUID in the client-owned `BNS-SaveState.j
 - `categories.categoryLimitsAffectWorldPickup` - default `true`
 - `categories.categoryLimitsAffectManualTransfers` - default `false`
 
-`config/bundlednotsiloed-client.toml` supplies initial/default values. Once the client runs, user changes are written to `BNS-SaveState.json` in the game directory instead, along with per-screen browser placement and UUID-keyed tab/hotbar/view preferences. This keeps player customizations outside the config directory used by modpack updates.
+`config/bundlednotsiloed-client.toml` supplies initial/default values. Once the client runs, user changes are written to `BNS-SaveState.json` in the game directory instead, along with UUID-keyed tab, hotbar, and view preferences. This keeps player customizations outside the config directory used by modpack updates.
 
 Client defaults/settings:
 
@@ -135,18 +134,9 @@ Client defaults/settings:
 - `pickupLimitNotification` - `NONE`, `HUD`, `ACTION_BAR`, `SOUND`, or `HUD_AND_SOUND`
 - `enableSearchTooltipIndexing`
 - `enableHotbarCycleOverlay`
-- `browserViewMode` - `GRID` (default) or `LIST`
-- `browserGridColumns` / `browserGridRows` - default `4` by `6`
 - `browserItemCountMode` - `EXACT`, `COMPACT` (default), `STACKS`, `STACKS_REMAINDER`, or `PERCENTAGE`
 - `browserOverallCountMode` - `EXACT`, `COMPACT`, `STACKS` (default), or `PERCENTAGE`
 - `manageTabsIcon` and `settingsIcon` - configurable item IDs for the square controls
-- `browserHandleIcon` - an item ID for the draggable handle (default `minecraft:spyglass`), or `bundlednotsiloed:logo` for the built-in project logo
-- `browserHandleVisible` and `browserDockSide` - defaults for container-screen types without saved state
-- `browserHandleX` and `browserHandleY` - deprecated absolute-position fields retained for config compatibility
-- `browserDefaultPlacement` - anchor used for container-screen types without saved positions; default `BOTTOM_RIGHT`, aligned beside the player hotbar
-- Per-screen GUI-relative placement, docking, open, and visibility state is stored in `BNS-SaveState.json`
-- `autoChooseBrowserSide` - optional side selection while dragging
-- `autoSideDeadZoneX` / `autoSideDeadZoneY` - center-screen dead-zone half sizes for automatic docking
 - `showBulkTransferOverlay` / `bulkTransferOverlaySeconds` - in-world bulk-transfer feedback and duration
 - `showFullInventoryBarrierIcons` - default `true`; when a cursor-held stack cannot add even one item, empty projected player slots display visual-only barrier icons
 - `inventoryFullSound` - sound event played after a cursor placement fails for lack of capacity; default `minecraft:block.note_block.bass`, or blank to disable
@@ -192,11 +182,11 @@ The player integration entry point is `com.cappleapple.bundlednotsiloed.api.Bund
 
 - The complete dynamic inventory is exposed through NeoForge's player entity item-handler capabilities.
 - Empty compatibility positions are retained as sparse holes, so explicit vanilla/API slot placement remains stable across inventory changes and persistence.
-- Vanilla menus retain 36 projected item indices and real armor/offhand indices. The custom inventory/container panels provide access to entries outside that projection.
-- Shift-clicks from external containers use vanilla visible-slot behavior while the browser is closed and the dynamic backend path while it is open. Player-owned main-grid/hotbar shift-clicks retain vanilla destination semantics whenever the browser is closed.
-- The public vanilla `Inventory.items` list is maintained as a live first-36 compatibility view for mods that access the field directly; direct replacements and stack mutations are reconciled into logical storage.
+- Vanilla menus retain 36 projected item indices and real armor/offhand indices. While an integrated screen is open, indices 9-35 are a synchronized viewport onto the current logical rows, providing native `Slot` interaction with entries outside the initial projection.
+- Shift-clicks from external containers use the dynamic backend path while a recognized integrated player grid is active. Player-to-container Shift-left keeps the active menu's one-stack native quick-move behavior; Shift-right repeats it until no more matching quantity can be accepted.
+- The public vanilla `Inventory.items` list is maintained as a live compatibility view of the hotbar plus the currently mapped 27-slot page while the browser is active; direct replacements and stack mutations are reconciled into logical storage.
 - The HUD hotbar and accessor APIs read the same live projection.
-- JEI and EMI receive the expanded browser as an exclusion area and can lay out their ingredient panels around it.
+- JEI and EMI retain recipe-transfer integration; the inventory browser no longer creates a floating exclusion area.
 - Recipe matching accounts for all logical stacks. Code that directly indexes `Inventory.items` observes the live first-36 view, while capability/API integrations can enumerate the complete dynamic backend.
 - Client UI classes are isolated behind the client-only mod entry point; the dedicated server smoke run loads no client package.
 

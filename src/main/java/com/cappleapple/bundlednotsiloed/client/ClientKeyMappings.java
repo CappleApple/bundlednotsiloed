@@ -9,8 +9,6 @@ import org.lwjgl.glfw.GLFW;
 
 public final class ClientKeyMappings {
     public static final String CATEGORY = "key.categories.bundlednotsiloed";
-    public static final KeyMapping TOGGLE_BROWSER = new KeyMapping("key.bundlednotsiloed.toggle_browser",
-            KeyConflictContext.GUI, KeyModifier.CONTROL, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_F, CATEGORY);
     public static final KeyMapping SEARCH_BROWSER = new KeyMapping("key.bundlednotsiloed.search_browser",
             KeyConflictContext.GUI, KeyModifier.NONE, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_F, CATEGORY);
     // Avoid Sophisticated Core's default [ and ] bulk-transfer bindings.
@@ -26,7 +24,6 @@ public final class ClientKeyMappings {
     private ClientKeyMappings() {}
 
     public static void register(RegisterKeyMappingsEvent event) {
-        event.register(TOGGLE_BROWSER);
         event.register(SEARCH_BROWSER);
         event.register(CYCLE_FORWARD);
         event.register(CYCLE_BACKWARD);

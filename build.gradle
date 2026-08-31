@@ -78,7 +78,6 @@ configurations {
 
 dependencies {
     implementation "com.cappleapple:stacksnotslots:${stacks_not_slots_version}"
-    implementation "com.cappleapple:panelsnotscreens:${panels_not_screens_version}"
     testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     def localJei = fileTree('modstotestwith') { include 'jei-*.jar' }
@@ -110,7 +109,6 @@ var generateModMetadata = tasks.register('generateModMetadata', ProcessResources
             mod_license                : mod_license,
             mod_version                : mod_version,
             stacks_not_slots_version   : stacks_not_slots_version,
-            panels_not_screens_version : panels_not_screens_version,
     ]
     inputs.properties replaceProperties
     expand replaceProperties

@@ -1,6 +1,7 @@
 package com.cappleapple.bundlednotsiloed.client;
 
 import com.cappleapple.bundlednotsiloed.config.ClientConfig;
+import com.cappleapple.bundlednotsiloed.client.screen.BundledInventoryScreen;
 import com.cappleapple.bundlednotsiloed.data.ModAttachments;
 import com.cappleapple.bundlednotsiloed.network.AutoRefillPayload;
 import com.cappleapple.bundlednotsiloed.network.HotbarCyclePayload;
@@ -8,6 +9,7 @@ import com.cappleapple.bundlednotsiloed.network.BulkTransferPayload;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.EventPriority;
@@ -30,6 +32,18 @@ public final class ClientEvents {
     @SubscribeEvent
     public static void playerLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
         ClientSaveState.endConnection();
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void replacePlayerInventoryScreen(ScreenEvent.Opening event) {
+        if (event.getNewScreen() == null || event.getNewScreen().getClass() != InventoryScreen.class) return;
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player != null) event.setNewScreen(new BundledInventoryScreen(minecraft.player));
+    }
+
+    @SubscribeEvent
+    public static void closeContainerOverlay(ScreenEvent.Closing event) {
+        ContainerInventoryOverlay.close(event.getScreen());
     }
 
     @SubscribeEvent

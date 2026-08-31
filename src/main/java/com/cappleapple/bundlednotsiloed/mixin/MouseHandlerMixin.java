@@ -8,7 +8,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Gives the visibly topmost browser first refusal before JEI, EMI, or screen widgets see mouse input. */
+/** Gives the integrated logical player grid first refusal before a container's native slot input. */
 @Mixin(value = MouseHandler.class, priority = 2000)
 public abstract class MouseHandlerMixin {
     @Inject(method = "onPress", at = @At("HEAD"), cancellable = true)

@@ -5,6 +5,7 @@ import com.cappleapple.stacksnotslots.api.inventory.DynamicCapacityInventory;
 import com.cappleapple.bundlednotsiloed.data.ModAttachments;
 import com.cappleapple.bundlednotsiloed.mixin.AbstractContainerMenuAccessor;
 import com.cappleapple.bundlednotsiloed.network.BulkTransferPayload;
+import com.cappleapple.bundlednotsiloed.network.BrowserTransferPayload;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.server.level.ServerPlayer;
@@ -39,56 +40,84 @@ public final class ContainerTransfers {
     }
 
     public static boolean moveBackendEntryToMenu(ServerPlayer player, ItemStack prototype) {
+        return moveBrowserEntryToMenu(
+                player, prototype, BrowserTransferPayload.Mode.SINGLE_STACK) > 0;
+    }
+
+    public static int moveBrowserEntryToMenu(
+            ServerPlayer player,
+            ItemStack prototype,
+            BrowserTransferPayload.Mode mode
+    ) {
         DynamicCapacityInventory inventory = player.getData(ModAttachments.PLAYER_DATA).inventory();
-        if (player.containerMenu == player.inventoryMenu) return inventory.moveBackendStackToMain(prototype);
-        if (moveBackendEntryWithNativeQuickMove(player, prototype, inventory)) return true;
+        if (player.containerMenu == player.inventoryMenu) {
+            return inventory.moveBackendStackToMain(prototype) ? 1 : 0;
+        }
+        int movedTotal = 0;
+        int maximumOperations = mode == BrowserTransferPayload.Mode.MAXIMUM
+                ? MAX_WORLD_STACK_OPERATIONS : 1;
+        for (int operation = 0; operation < maximumOperations; operation++) {
+            player.getData(ModAttachments.PLAYER_DATA).refreshInventoryWindow();
+            int moved = moveVisibleEntryWithNativeQuickMove(player, prototype, inventory);
+            if (moved <= 0) moved = moveOneThroughExternalRanges(player, prototype, inventory);
+            if (moved <= 0) break;
+            movedTotal += moved;
+            if (mode == BrowserTransferPayload.Mode.SINGLE_STACK) break;
+        }
+        if (movedTotal > 0) player.containerMenu.broadcastChanges();
+        return movedTotal;
+    }
+
+    private static int moveOneThroughExternalRanges(
+            ServerPlayer player,
+            ItemStack prototype,
+            DynamicCapacityInventory inventory
+    ) {
         List<Range> ranges = externalRanges(player.containerMenu, player);
-        if (ranges.isEmpty()) return false;
-        int available = inventory.extractAtOrAfter(prototype, prototype.getMaxStackSize(), 36, true).extractedAmount();
-        if (available <= 0) return false;
+        if (ranges.isEmpty()) return 0;
+        int available = inventory.extractAtOrAfter(
+                prototype, prototype.getMaxStackSize(), MAIN_GRID_START, true).extractedAmount();
+        if (available <= 0) return 0;
         ItemStack moving = prototype.copyWithCount(available);
         int before = moving.getCount();
         moveThroughRanges(player.containerMenu, moving, ranges);
         int moved = before - moving.getCount();
-        if (moved <= 0) return false;
-        inventory.extractAtOrAfter(prototype, moved, 36, false);
-        player.containerMenu.broadcastChanges();
-        return true;
+        if (moved <= 0) return 0;
+        inventory.extractAtOrAfter(prototype, moved, MAIN_GRID_START, false);
+        return moved;
     }
 
-    /**
-     * Stages a backend stack in a real player slot, invokes the active menu's own quick-move path,
-     * then restores the displaced player stack. This supports virtual storage terminals and custom
-     * merge logic without compile-time dependencies or per-mod handlers.
-     */
-    private static boolean moveBackendEntryWithNativeQuickMove(ServerPlayer player, ItemStack prototype,
-                                                                DynamicCapacityInventory inventory) {
+    /** Uses the active menu's native quick-move path for the currently mapped real player slot. */
+    private static int moveVisibleEntryWithNativeQuickMove(ServerPlayer player, ItemStack prototype,
+                                                            DynamicCapacityInventory inventory) {
         AbstractContainerMenu menu = player.containerMenu;
-        for (int ordinal = 0; ordinal < 36; ordinal++) {
-            int playerSlot = ordinal < 27 ? ordinal + 9 : ordinal - 27;
-            for (int menuIndex = 0; menuIndex < menu.slots.size(); menuIndex++) {
-                Slot slot = menu.slots.get(menuIndex);
-                if (!isPlayerSlot(slot, player) || slot.getContainerSlot() != playerSlot || !slot.isActive()) continue;
-                DynamicCapacityInventory.BackendQuickMoveStage stage =
-                        inventory.beginBackendQuickMove(prototype, playerSlot);
-                if (stage == null) return false;
-                if (!slot.hasItem() || !slot.mayPickup(player)) {
-                    inventory.finishBackendQuickMove(stage);
-                    continue;
-                }
-
-                int moved;
-                try {
-                    menu.quickMoveStack(player, menuIndex);
-                } finally {
-                    moved = inventory.finishBackendQuickMove(stage);
-                }
-                if (moved <= 0) continue;
-                menu.broadcastChanges();
-                return true;
-            }
+        long before = quantityAtOrAfter(inventory, prototype, MAIN_GRID_START);
+        for (int menuIndex = 0; menuIndex < menu.slots.size(); menuIndex++) {
+            Slot slot = menu.slots.get(menuIndex);
+            if (!isPlayerSlot(slot, player) || !slot.isActive() || !slot.hasItem()
+                    || slot.getContainerSlot() < MAIN_GRID_START
+                    || slot.getContainerSlot() >= 36
+                    || !slot.mayPickup(player)
+                    || !ItemStack.isSameItemSameComponents(slot.getItem(), prototype)) continue;
+            menu.quickMoveStack(player, menuIndex);
+            long after = quantityAtOrAfter(inventory, prototype, MAIN_GRID_START);
+            if (after < before) return (int)Math.min(Integer.MAX_VALUE, before - after);
         }
-        return false;
+        return 0;
+    }
+
+    static long quantityAtOrAfter(
+            DynamicCapacityInventory inventory,
+            ItemStack prototype,
+            int minimumSlot
+    ) {
+        long quantity = 0;
+        List<ItemStack> stacks = inventory.backingStacks();
+        for (int slot = Math.max(0, minimumSlot); slot < stacks.size(); slot++) {
+            ItemStack stack = stacks.get(slot);
+            if (ItemStack.isSameItemSameComponents(stack, prototype)) quantity += stack.getCount();
+        }
+        return quantity;
     }
 
     private static List<TransferredStack> movePlayerToOpenMenu(ServerPlayer player) {

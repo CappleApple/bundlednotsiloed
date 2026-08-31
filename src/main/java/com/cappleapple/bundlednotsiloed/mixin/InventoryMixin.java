@@ -46,12 +46,12 @@ public abstract class InventoryMixin {
 
     @Unique
     private int sns$logicalIndex(int vanillaSlot) {
-        return vanillaSlot;
+        return sns$data().inventoryWindow().logicalIndex(vanillaSlot);
     }
 
     @Unique
     private int sns$vanillaSlotForLogical(int logicalIndex) {
-        return logicalIndex >= 0 && logicalIndex < Inventory.INVENTORY_SIZE ? logicalIndex : -1;
+        return sns$data().inventoryWindow().vanillaSlotForLogical(logicalIndex);
     }
 
     @Inject(method = "getItem", at = @At("HEAD"), cancellable = true)
@@ -183,7 +183,7 @@ public abstract class InventoryMixin {
     private void sns$getFreeSlot(CallbackInfoReturnable<Integer> callback) {
         if (!sns$active()) return;
         for (int slot = 0; slot < Inventory.INVENTORY_SIZE; slot++) {
-            if (sns$data().inventory().syntheticStack(slot).isEmpty()) {
+            if (sns$data().inventory().syntheticStack(sns$logicalIndex(slot)).isEmpty()) {
                 callback.setReturnValue(slot);
                 return;
             }
@@ -221,11 +221,12 @@ public abstract class InventoryMixin {
     private void sns$remainingSpace(ItemStack stack, CallbackInfoReturnable<Integer> callback) {
         if (!sns$active()) return;
         List<ItemStack> stacks = sns$data().inventory().backingStacks();
-        for (int i = 0; i < Math.min(stacks.size(), Inventory.INVENTORY_SIZE); i++) {
-            ItemStack stored = stacks.get(i);
+        for (int vanillaSlot = 0; vanillaSlot < Inventory.INVENTORY_SIZE; vanillaSlot++) {
+            int logicalSlot = sns$logicalIndex(vanillaSlot);
+            ItemStack stored = logicalSlot < stacks.size() ? stacks.get(logicalSlot) : ItemStack.EMPTY;
             if (stored.isEmpty()) continue;
             if (ItemStack.isSameItemSameComponents(stored, stack) && stored.getCount() < stored.getMaxStackSize()) {
-                callback.setReturnValue(i);
+                callback.setReturnValue(vanillaSlot);
                 return;
             }
         }

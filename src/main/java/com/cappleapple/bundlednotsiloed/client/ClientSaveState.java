@@ -19,7 +19,6 @@ import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.nbt.CompoundTag;
@@ -62,7 +61,6 @@ public final class ClientSaveState {
         loaded = true;
         if (migrated) {
             captureClientSettings();
-            importLegacyBrowserStates();
             saveNow();
         } else {
             applyClientSettings();
@@ -114,25 +112,6 @@ public final class ClientSaveState {
         saveNow();
     }
 
-    static synchronized Optional<BrowserScreenStateStore.State> browserState(String screenType) {
-        initialize();
-        SavedBrowserState saved = data.browserScreens.get(screenType);
-        if (saved == null) return Optional.empty();
-        try {
-            return Optional.of(new BrowserScreenStateStore.State(screenType, saved.offsetX, saved.offsetY,
-                    saved.open, saved.visible, ClientConfig.BrowserDockSide.valueOf(saved.dockSide)));
-        } catch (IllegalArgumentException | NullPointerException ignored) {
-            return Optional.empty();
-        }
-    }
-
-    static synchronized void saveBrowserState(BrowserScreenStateStore.State state) {
-        initialize();
-        data.browserScreens.put(state.screenType(), new SavedBrowserState(
-                state.offsetX(), state.offsetY(), state.open(), state.visible(), state.dockSide().name()));
-        saveNow();
-    }
-
     public static Path savePath() {
         return Minecraft.getInstance().gameDirectory.toPath().resolve(FILE_NAME);
     }
@@ -149,7 +128,6 @@ public final class ClientSaveState {
     private static void normalize() {
         data.schemaVersion = SCHEMA_VERSION;
         if (data.settings == null) data.settings = new JsonObject();
-        if (data.browserScreens == null) data.browserScreens = new LinkedHashMap<>();
         if (data.players == null) data.players = new LinkedHashMap<>();
     }
 
@@ -167,24 +145,10 @@ public final class ClientSaveState {
         put(settings, "pickupLimitNotification", ClientConfig.PICKUP_NOTIFICATION.get().name());
         put(settings, "enableSearchTooltipIndexing", ClientConfig.TOOLTIP_INDEXING.getAsBoolean());
         put(settings, "enableHotbarCycleOverlay", ClientConfig.HOTBAR_CYCLE_OVERLAY.getAsBoolean());
-        put(settings, "browserViewMode", ClientConfig.BROWSER_VIEW_MODE.get().name());
-        put(settings, "browserGridColumns", ClientConfig.BROWSER_GRID_COLUMNS.getAsInt());
-        put(settings, "browserGridRows", ClientConfig.BROWSER_GRID_ROWS.getAsInt());
         put(settings, "browserItemCountMode", ClientConfig.ITEM_COUNT_MODE.get().name());
         put(settings, "browserOverallCountMode", ClientConfig.OVERALL_COUNT_MODE.get().name());
         put(settings, "manageTabsIcon", ClientConfig.MANAGE_TABS_ICON.get());
         put(settings, "settingsIcon", ClientConfig.SETTINGS_ICON.get());
-        put(settings, "browserHandleIcon", ClientConfig.BROWSER_HANDLE_ICON.get());
-        put(settings, "browserHandleIconMigrated", ClientConfig.BROWSER_HANDLE_ICON_MIGRATED.getAsBoolean());
-        put(settings, "browserHandleSpyglassRestored", ClientConfig.BROWSER_HANDLE_SPYGLASS_RESTORED.getAsBoolean());
-        put(settings, "browserHandleX", ClientConfig.BROWSER_HANDLE_X.getAsInt());
-        put(settings, "browserHandleY", ClientConfig.BROWSER_HANDLE_Y.getAsInt());
-        put(settings, "browserHandleVisible", ClientConfig.BROWSER_HANDLE_VISIBLE.getAsBoolean());
-        put(settings, "browserDockSide", ClientConfig.BROWSER_DOCK_SIDE.get().name());
-        put(settings, "browserDefaultPlacement", ClientConfig.BROWSER_DEFAULT_PLACEMENT.get().name());
-        put(settings, "autoChooseBrowserSide", ClientConfig.AUTO_BROWSER_DOCK_SIDE.getAsBoolean());
-        put(settings, "autoSideDeadZoneX", ClientConfig.AUTO_DOCK_DEAD_ZONE_X.getAsInt());
-        put(settings, "autoSideDeadZoneY", ClientConfig.AUTO_DOCK_DEAD_ZONE_Y.getAsInt());
         put(settings, "showBulkTransferOverlay", ClientConfig.BULK_TRANSFER_OVERLAY.getAsBoolean());
         put(settings, "bulkTransferOverlaySeconds", ClientConfig.BULK_TRANSFER_OVERLAY_SECONDS.get());
         put(settings, "showFullInventoryBarrierIcons", ClientConfig.FULL_INVENTORY_BARRIER_ICONS.getAsBoolean());
@@ -198,35 +162,14 @@ public final class ClientSaveState {
         setEnum(settings, "pickupLimitNotification", ClientConfig.PickupNotification.class, ClientConfig.PICKUP_NOTIFICATION::set);
         setBoolean(settings, "enableSearchTooltipIndexing", ClientConfig.TOOLTIP_INDEXING::set);
         setBoolean(settings, "enableHotbarCycleOverlay", ClientConfig.HOTBAR_CYCLE_OVERLAY::set);
-        setEnum(settings, "browserViewMode", ClientConfig.BrowserViewMode.class, ClientConfig.BROWSER_VIEW_MODE::set);
-        setInteger(settings, "browserGridColumns", 1, 16, ClientConfig.BROWSER_GRID_COLUMNS::set);
-        setInteger(settings, "browserGridRows", 1, 20, ClientConfig.BROWSER_GRID_ROWS::set);
         setEnum(settings, "browserItemCountMode", ClientConfig.ItemCountMode.class, ClientConfig.ITEM_COUNT_MODE::set);
         setEnum(settings, "browserOverallCountMode", ClientConfig.OverallCountMode.class, ClientConfig.OVERALL_COUNT_MODE::set);
         setString(settings, "manageTabsIcon", ClientConfig.MANAGE_TABS_ICON::set);
         setString(settings, "settingsIcon", ClientConfig.SETTINGS_ICON::set);
-        setString(settings, "browserHandleIcon", ClientConfig.BROWSER_HANDLE_ICON::set);
-        setBoolean(settings, "browserHandleIconMigrated", ClientConfig.BROWSER_HANDLE_ICON_MIGRATED::set);
-        setBoolean(settings, "browserHandleSpyglassRestored", ClientConfig.BROWSER_HANDLE_SPYGLASS_RESTORED::set);
-        setInteger(settings, "browserHandleX", -1, 16384, ClientConfig.BROWSER_HANDLE_X::set);
-        setInteger(settings, "browserHandleY", -1, 16384, ClientConfig.BROWSER_HANDLE_Y::set);
-        setBoolean(settings, "browserHandleVisible", ClientConfig.BROWSER_HANDLE_VISIBLE::set);
-        setEnum(settings, "browserDockSide", ClientConfig.BrowserDockSide.class, ClientConfig.BROWSER_DOCK_SIDE::set);
-        setEnum(settings, "browserDefaultPlacement", ClientConfig.BrowserDefaultPlacement.class, ClientConfig.BROWSER_DEFAULT_PLACEMENT::set);
-        setBoolean(settings, "autoChooseBrowserSide", ClientConfig.AUTO_BROWSER_DOCK_SIDE::set);
-        setInteger(settings, "autoSideDeadZoneX", 0, 4096, ClientConfig.AUTO_DOCK_DEAD_ZONE_X::set);
-        setInteger(settings, "autoSideDeadZoneY", 0, 4096, ClientConfig.AUTO_DOCK_DEAD_ZONE_Y::set);
         setBoolean(settings, "showBulkTransferOverlay", ClientConfig.BULK_TRANSFER_OVERLAY::set);
         setDouble(settings, "bulkTransferOverlaySeconds", 0.25D, 30.0D, ClientConfig.BULK_TRANSFER_OVERLAY_SECONDS::set);
         setBoolean(settings, "showFullInventoryBarrierIcons", ClientConfig.FULL_INVENTORY_BARRIER_ICONS::set);
         setString(settings, "inventoryFullSound", ClientConfig.INVENTORY_FULL_SOUND::set);
-    }
-
-    private static void importLegacyBrowserStates() {
-        for (String encoded : ClientConfig.BROWSER_SCREEN_STATES.get()) {
-            BrowserScreenStateStore.decode(encoded).ifPresent(state -> data.browserScreens.put(state.screenType(),
-                    new SavedBrowserState(state.offsetX(), state.offsetY(), state.open(), state.visible(), state.dockSide().name())));
-        }
     }
 
     private static void saveNow() {
@@ -307,10 +250,8 @@ public final class ClientSaveState {
     private static final class SaveData {
         private int schemaVersion = SCHEMA_VERSION;
         private JsonObject settings = new JsonObject();
-        private Map<String, SavedBrowserState> browserScreens = new LinkedHashMap<>();
         private Map<String, PlayerProfile> players = new LinkedHashMap<>();
     }
 
-    private record SavedBrowserState(int offsetX, int offsetY, boolean open, boolean visible, String dockSide) {}
     private record PlayerProfile(String customization) {}
 }

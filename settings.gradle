@@ -14,10 +14,4 @@ includeBuild('../stacks-not-slots') {
     }
 }
 
-includeBuild('../panels-not-screens') {
-    dependencySubstitution {
-        substitute module('com.cappleapple:panelsnotscreens') using project(':')
-    }
-}
-
 rootProject.name = 'bundled-not-siloed'

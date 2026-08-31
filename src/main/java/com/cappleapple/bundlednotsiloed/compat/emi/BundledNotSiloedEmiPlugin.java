@@ -1,6 +1,5 @@
 package com.cappleapple.bundlednotsiloed.compat.emi;
 
-import com.cappleapple.bundlednotsiloed.client.ContainerInventoryOverlay;
 import com.cappleapple.bundlednotsiloed.data.ModAttachments;
 import com.cappleapple.bundlednotsiloed.network.RecipeTransferPayload;
 import dev.emi.emi.api.EmiEntrypoint;
@@ -10,7 +9,6 @@ import dev.emi.emi.api.recipe.EmiPlayerInventory;
 import dev.emi.emi.api.recipe.EmiRecipe;
 import dev.emi.emi.api.recipe.handler.EmiCraftContext;
 import dev.emi.emi.api.stack.EmiStack;
-import dev.emi.emi.api.widget.Bounds;
 import dev.emi.emi.handler.CraftingRecipeHandler;
 import dev.emi.emi.handler.InventoryRecipeHandler;
 import dev.emi.emi.registry.EmiRecipeFiller;
@@ -18,7 +16,6 @@ import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
-import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.world.inventory.CraftingMenu;
 import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.inventory.MenuType;
@@ -27,19 +24,11 @@ import net.minecraft.world.item.crafting.CraftingRecipe;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.neoforged.neoforge.network.PacketDistributor;
 
-/** Reserves the floating browser on every container screen so EMI lays its ingredient list around it. */
+/** Supplies complete logical-inventory crafting data to EMI's native screen integration. */
 @EmiEntrypoint
 public final class BundledNotSiloedEmiPlugin implements EmiPlugin {
     @Override
     public void register(EmiRegistry registry) {
-        // Use EMI's global provider rather than attaching a competing handler to every subclass.
-        registry.addGenericExclusionArea((screen, consumer) -> {
-            if (!(screen instanceof AbstractContainerScreen<?> containerScreen)) return;
-            for (Rect2i area : ContainerInventoryOverlay.currentAreas(containerScreen)) {
-                consumer.accept(new Bounds(area.getX(), area.getY(), area.getWidth(), area.getHeight()));
-            }
-        });
-
         BnsInventoryRecipeHandler inventoryHandler = new BnsInventoryRecipeHandler();
         BnsCraftingRecipeHandler craftingHandler = new BnsCraftingRecipeHandler();
         registry.addRecipeHandler((MenuType<InventoryMenu>)null, inventoryHandler);

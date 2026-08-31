@@ -12,7 +12,7 @@ authors="CappleApple"
 logoFile="assets/bundlednotsiloed/textures/gui/bundled-not-siloed-logo.png"
 logoBlur=false
 description='''
-Player-facing capacity inventory overhaul powered by Stacks Not Slots and Panels Not Screens.
+Player-facing capacity inventory overhaul powered by Stacks Not Slots and integrated native inventory screens.
 '''
 
 [[mixins]]
@@ -38,10 +38,3 @@ config="${mod_id}.mixins.json"
     versionRange="[${stacks_not_slots_version},)"
     ordering="BEFORE"
     side="BOTH"
-
-[[dependencies.${mod_id}]]
-    modId="panelsnotscreens"
-    type="required"
-    versionRange="[${panels_not_screens_version},)"
-    ordering="BEFORE"
-    side="CLIENT"

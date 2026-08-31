@@ -34,7 +34,9 @@ public abstract class InventoryMenuMixin {
         if (canAutoEquip) return;
 
         ItemStack original = source.copy();
-        if (!player.getData(ModAttachments.PLAYER_DATA).inventory().stowSyntheticSlot(inventorySlot)) return;
+        int logicalSlot = player.getData(ModAttachments.PLAYER_DATA)
+                .inventoryWindow().logicalIndex(inventorySlot);
+        if (!player.getData(ModAttachments.PLAYER_DATA).inventory().stowSyntheticSlot(logicalSlot)) return;
         menu.broadcastChanges();
         callback.setReturnValue(original);
     }

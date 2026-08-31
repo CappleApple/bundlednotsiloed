@@ -14,9 +14,11 @@
     "SlotMixin"
   ],
   "client": [
+    "AbstractContainerScreenMixin",
     "CreativeModeInventoryScreenMixin",
     "GuiMixin",
-    "MouseHandlerMixin"
+    "MouseHandlerMixin",
+    "SlotAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

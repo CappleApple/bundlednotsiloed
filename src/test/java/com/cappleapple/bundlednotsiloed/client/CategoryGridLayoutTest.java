@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test;
 class CategoryGridLayoutTest {
     @Test
     void laysOutAndScrollsWholeRows() {
-        CategoryGridLayout first = CategoryGridLayout.calculate(80, 60, 17, 0);
+        CategoryGridLayout first = CategoryGridLayout.calculate(72, 54, 17, 0);
         assertEquals(4, first.columns());
         assertEquals(3, first.rows());
         assertEquals(2, first.maximumScrollRow());
@@ -15,7 +15,7 @@ class CategoryGridLayoutTest {
         assertEquals(12, first.visibleCount());
         assertEquals(6, first.indexAt(45, 25));
 
-        CategoryGridLayout last = CategoryGridLayout.calculate(80, 60, 17, 99);
+        CategoryGridLayout last = CategoryGridLayout.calculate(72, 54, 17, 99);
         assertEquals(2, last.scrollRow());
         assertEquals(8, last.firstIndex());
         assertEquals(9, last.visibleCount());

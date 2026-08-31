@@ -29,4 +29,16 @@ class ContainerTransfersTest {
         assertEquals(5, inventory.syntheticStack(0).getCount());
         assertTrue(inventory.syntheticStack(9).isEmpty());
     }
+
+    @Test
+    void browserQuantityIncludesMainGridAndBackendButNeverHotbar() {
+        DynamicCapacityInventory inventory = new DynamicCapacityInventory(() -> 512);
+        inventory.replaceSyntheticSlot(0, new ItemStack(Items.APPLE, 5));
+        inventory.replaceSyntheticSlot(9, new ItemStack(Items.APPLE, 32));
+        inventory.replaceSyntheticSlot(36, new ItemStack(Items.APPLE, 64));
+        inventory.replaceSyntheticSlot(37, new ItemStack(Items.APPLE, 7));
+
+        assertEquals(103, ContainerTransfers.quantityAtOrAfter(
+                inventory, new ItemStack(Items.APPLE), 9));
+    }
 }

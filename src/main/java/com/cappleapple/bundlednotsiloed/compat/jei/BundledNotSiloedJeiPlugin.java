@@ -1,10 +1,8 @@
 package com.cappleapple.bundlednotsiloed.compat.jei;
 
 import com.cappleapple.bundlednotsiloed.BundledNotSiloed;
-import com.cappleapple.bundlednotsiloed.client.ContainerInventoryOverlay;
 import com.cappleapple.bundlednotsiloed.data.ModAttachments;
 import com.cappleapple.bundlednotsiloed.network.RecipeTransferPayload;
-import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import mezz.jei.api.IModPlugin;
@@ -16,12 +14,7 @@ import mezz.jei.api.recipe.RecipeType;
 import mezz.jei.api.recipe.transfer.IRecipeTransferError;
 import mezz.jei.api.recipe.transfer.IRecipeTransferHandler;
 import mezz.jei.api.recipe.transfer.IRecipeTransferHandlerHelper;
-import mezz.jei.api.gui.handlers.IGlobalGuiHandler;
-import mezz.jei.api.registration.IGuiHandlerRegistration;
 import mezz.jei.api.registration.IRecipeTransferRegistration;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
-import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
@@ -35,7 +28,7 @@ import net.minecraft.world.item.crafting.CraftingRecipe;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.neoforged.neoforge.network.PacketDistributor;
 
-/** Reserves the floating browser on every container screen so JEI lays its ingredient list around it. */
+/** Supplies complete logical-inventory crafting data to JEI's native screen integration. */
 @JeiPlugin
 public final class BundledNotSiloedJeiPlugin implements IModPlugin {
     private static final ResourceLocation ID = BundledNotSiloed.id("jei_integration");
@@ -43,20 +36,6 @@ public final class BundledNotSiloedJeiPlugin implements IModPlugin {
     @Override
     public ResourceLocation getPluginUid() {
         return ID;
-    }
-
-    @Override
-    public void registerGuiHandlers(IGuiHandlerRegistration registration) {
-        // A global extra-area provider does not join or replace a concrete screen's own JEI handler.
-        // That distinction matters for custom screens such as Sophisticated Core's StorageScreenBase.
-        registration.addGlobalGuiHandler(new IGlobalGuiHandler() {
-            @Override
-            public Collection<Rect2i> getGuiExtraAreas() {
-                return Minecraft.getInstance().screen instanceof AbstractContainerScreen<?> screen
-                        ? ContainerInventoryOverlay.currentAreas(screen)
-                        : List.of();
-            }
-        });
     }
 
     @Override

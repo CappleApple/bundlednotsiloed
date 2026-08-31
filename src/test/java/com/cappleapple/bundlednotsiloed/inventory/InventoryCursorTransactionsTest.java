@@ -46,6 +46,25 @@ class InventoryCursorTransactionsTest {
         assertTrue(inventory.validate());
     }
 
+    @Test
+    void integratedBrowserCombinesMainGridAndBackendButLeavesHotbarUntouched() {
+        DynamicCapacityInventory inventory = new DynamicCapacityInventory(() -> 512);
+        inventory.replaceSyntheticSlotFromItemUse(0, new ItemStack(Items.STONE, 5));
+        inventory.replaceSyntheticSlotFromItemUse(9, new ItemStack(Items.STONE, 40));
+        inventory.replaceSyntheticSlotFromItemUse(36, new ItemStack(Items.STONE, 40));
+
+        ItemStack taken = InventoryCursorTransactions.takeFromRange(
+                inventory, new ItemStack(Items.STONE), 64, false, 9);
+
+        assertEquals(64, taken.getCount());
+        assertEquals(5, inventory.syntheticStack(0).getCount());
+        assertEquals(16, inventory.entriesAtOrAfter(9).stream()
+                .filter(entry -> entry.representative().is(Items.STONE))
+                .mapToInt(entry -> (int)entry.quantity())
+                .sum());
+        assertTrue(inventory.validate());
+    }
+
     private static DynamicCapacityInventory inventoryWithHiddenStone() {
         DynamicCapacityInventory inventory = new DynamicCapacityInventory(() -> 512);
         inventory.replaceSyntheticSlotFromItemUse(0, new ItemStack(Items.STONE, 3));
