@@ -186,6 +186,10 @@ public final class BundledInventoryScreen extends InventoryScreen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        boolean searchClicked = InventorySearchBar.contains(mouseX, mouseY,
+                this.leftPos + InventoryScreenLayout.SEARCH_X,
+                this.topPos + InventoryScreenLayout.SEARCH_Y);
+        if (!searchClicked) clearSearchFocus();
         if (blockedByRecipeBook()) return super.mouseClicked(mouseX, mouseY, button);
         double localX = mouseX - this.leftPos;
         double localY = mouseY - this.topPos;
@@ -234,10 +238,7 @@ public final class BundledInventoryScreen extends InventoryScreen {
             settingsMenuOpen = false;
         }
 
-        if (InventoryScreenLayout.inside(localX, localY,
-                InventoryScreenLayout.SEARCH_X, InventoryScreenLayout.SEARCH_Y,
-                InventoryScreenLayout.SEARCH_WIDTH, InventoryScreenLayout.SEARCH_HEIGHT)
-                && button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
+        if (searchClicked && button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
             searchBox.setValue("");
             focusSearch();
             return true;
@@ -320,8 +321,7 @@ public final class BundledInventoryScreen extends InventoryScreen {
         if (searchBox.isFocused()) {
             if (minecraft.options.keyInventory.matches(keyCode, scanCode)) return true;
             if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
-                searchBox.setFocused(false);
-                this.setFocused(null);
+                clearSearchFocus();
                 return true;
             }
         }
@@ -622,6 +622,12 @@ public final class BundledInventoryScreen extends InventoryScreen {
         settingsMenuOpen = false;
         this.setFocused(searchBox);
         searchBox.setFocused(true);
+    }
+
+    private void clearSearchFocus() {
+        if (searchBox == null || !searchBox.isFocused()) return;
+        searchBox.setFocused(false);
+        this.setFocused(null);
     }
 
     private void invalidateEntries() {

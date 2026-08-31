@@ -793,8 +793,7 @@ public final class ContainerInventoryOverlay {
             return guiLeft + cells.stream().mapToInt(Cell::x).max().orElse(cells.getFirst().x()) + 19;
         }
         boolean searchContains(double x, double y) {
-            return InventoryScreenLayout.inside(x, y, searchX(), searchY(),
-                    InventorySearchBar.WIDTH, InventorySearchBar.HEIGHT);
+            return InventorySearchBar.contains(x, y, searchX(), searchY());
         }
         boolean categoryContains(double x, double y) {
             return InventoryScreenLayout.inside(x, y, categoryX(), controlY(),

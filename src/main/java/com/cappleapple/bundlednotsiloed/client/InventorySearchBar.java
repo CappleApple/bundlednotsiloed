@@ -37,6 +37,10 @@ public final class InventorySearchBar {
         }
     }
 
+    public static boolean contains(double mouseX, double mouseY, int x, int y) {
+        return InventoryScreenLayout.inside(mouseX, mouseY, x, y, WIDTH, HEIGHT);
+    }
+
     public static List<Component> tooltip(DynamicCapacityInventory inventory, boolean detailed) {
         if (detailed) {
             return List.of(

@@ -1,12 +1,23 @@
 package com.cappleapple.bundlednotsiloed.client;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.cappleapple.stacksnotslots.api.CapacityAmount;
 import com.cappleapple.stacksnotslots.api.inventory.DynamicCapacityInventory;
 import org.junit.jupiter.api.Test;
 
 class InventorySearchBarTest {
+    @Test
+    void clickFocusUsesTheWholeSearchBarAndClearsOutsideItsEdges() {
+        assertTrue(InventorySearchBar.contains(10, 20, 10, 20));
+        assertTrue(InventorySearchBar.contains(100, 32, 10, 20));
+        assertFalse(InventorySearchBar.contains(9, 20, 10, 20));
+        assertFalse(InventorySearchBar.contains(101, 20, 10, 20));
+        assertFalse(InventorySearchBar.contains(10, 33, 10, 20));
+    }
+
     @Test
     void capacityFillClampsAndRetainsAVisibleFirstPixel() {
         assertEquals(0, InventorySearchBar.fillWidth(CapacityAmount.ZERO, 100));

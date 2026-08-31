@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.1 - 2026-08-31
+
+### Fixed
+
+- Clicking outside an integrated inventory search bar now releases keyboard focus so normal inventory input resumes immediately.
+
 ## 1.3 - 2026-08-31
 
 ### Added
