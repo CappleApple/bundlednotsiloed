@@ -1,9 +1,10 @@
 package com.cappleapple.bundlednotsiloed.mixin;
 
 import com.cappleapple.bundlednotsiloed.data.ModAttachments;
-import com.cappleapple.bundlednotsiloed.inventory.InventoryTransactions;
 import com.cappleapple.bundlednotsiloed.inventory.ContainerTransfers;
-import com.cappleapple.bundlednotsiloed.network.ModNetwork;
+import com.cappleapple.bundlednotsiloed.inventory.InventoryTransactions;
+import com.cappleapple.bundlednotsiloed.inventory.NewItemDestination;
+import com.cappleapple.bundlednotsiloed.inventory.WorldPickupInsertion;
 import java.util.List;
 import java.util.UUID;
 import net.minecraft.core.NonNullList;
@@ -23,13 +24,14 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/** Routes shift-click insertion into player storage through the unbounded logical append path. */
+/** Routes external Shift-click insertion through identity-aware player storage placement. */
 @Mixin(AbstractContainerMenu.class)
 public abstract class AbstractContainerMenuMixin {
     @Shadow @Final public NonNullList<Slot> slots;
     @Unique private UUID sns$quickMovePlayerId;
     @Unique private List<ItemStack> sns$quickMoveVisibleBefore = List.of();
     @Unique private boolean sns$quickMoveBackendOnly;
+    @Unique private NewItemDestination sns$quickMoveDestination = NewItemDestination.INVENTORY_FIRST;
 
     @Inject(method = "moveItemStackTo", at = @At("HEAD"), cancellable = true)
     private void sns$insertIntoUnifiedPlayerInventory(
@@ -47,8 +49,7 @@ public abstract class AbstractContainerMenuMixin {
             // honor the exact destination range instead of treating it as external insertion.
             return;
         }
-        boolean backendOnly = ModNetwork.isBrowserOpen(playerInventory.player)
-                || ContainerTransfers.isBulkBackendRedirect(playerInventory.player);
+        boolean backendOnly = ContainerTransfers.isBulkBackendRedirect(playerInventory.player);
         var insertion = backendOnly
                 ? InventoryTransactions.insertIntoBackend(playerInventory.player, source, false)
                 : InventoryTransactions.insertInPlayerTransferOrder(playerInventory.player, source, false);
@@ -66,16 +67,17 @@ public abstract class AbstractContainerMenuMixin {
                                               CallbackInfo callback) {
         sns$quickMovePlayerId = null;
         sns$quickMoveVisibleBefore = List.of();
+        sns$quickMoveDestination = NewItemDestination.INVENTORY_FIRST;
         if (!(player instanceof ServerPlayer) || clickType != ClickType.QUICK_MOVE
                 || slotId < 0 || slotId >= slots.size()
                 || !player.getData(ModAttachments.PLAYER_DATA).migratedVanillaInventory()) return;
         Slot source = slots.get(slotId);
         if (source.container == player.getInventory() || !source.hasItem()) return;
+        var data = player.getData(ModAttachments.PLAYER_DATA);
         sns$quickMovePlayerId = player.getUUID();
-        sns$quickMoveVisibleBefore = player.getData(ModAttachments.PLAYER_DATA)
-                .inventory().visibleCompatibilitySnapshot();
-        sns$quickMoveBackendOnly = ModNetwork.isBrowserOpen(player)
-                || ContainerTransfers.isBulkBackendRedirect(player);
+        sns$quickMoveVisibleBefore = data.inventory().visibleCompatibilitySnapshot();
+        sns$quickMoveBackendOnly = ContainerTransfers.isBulkBackendRedirect(player);
+        sns$quickMoveDestination = data.newItemDestination();
     }
 
     /** Repositions only what the custom menu added, preserving every pre-existing visible stack. */
@@ -85,11 +87,16 @@ public abstract class AbstractContainerMenuMixin {
         UUID capturedPlayerId = sns$quickMovePlayerId;
         List<ItemStack> visibleBefore = sns$quickMoveVisibleBefore;
         boolean backendOnly = sns$quickMoveBackendOnly;
+        NewItemDestination destination = sns$quickMoveDestination;
         sns$quickMovePlayerId = null;
         sns$quickMoveVisibleBefore = List.of();
+        sns$quickMoveDestination = NewItemDestination.INVENTORY_FIRST;
         if (capturedPlayerId == null || !capturedPlayerId.equals(player.getUUID())) return;
         var inventory = player.getData(ModAttachments.PLAYER_DATA).inventory();
-        if (!inventory.relocateReceivedVisibleStacks(visibleBefore, backendOnly)) return;
+        boolean relocated = backendOnly
+                ? inventory.relocateReceivedVisibleStacks(visibleBefore, true)
+                : WorldPickupInsertion.relocateReceivedVisibleStacks(inventory, visibleBefore, destination);
+        if (!relocated) return;
         player.getInventory().setChanged();
         ((AbstractContainerMenu)(Object)this).broadcastChanges();
     }

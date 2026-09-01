@@ -45,11 +45,12 @@ public final class InventoryProjection {
         }
 
         ArrayList<ProjectedStack> ordered = new ArrayList<>(distinct.values());
-        ordered.sort(comparator(data.inventorySortPreference()));
-        data.inventory().arrangeMainGrid(ordered.stream().map(ProjectedStack::index).toList());
+        ordered.sort(comparator(data, data.inventorySortPreference()));
+        data.arrangeWithoutRecordingRecentChanges(() ->
+                data.inventory().arrangeMainGrid(ordered.stream().map(ProjectedStack::index).toList()));
     }
 
-    private static Comparator<ProjectedStack> comparator(SortMode mode) {
+    private static Comparator<ProjectedStack> comparator(PlayerInventoryData data, SortMode mode) {
         Comparator<ProjectedStack> byName = Comparator.comparing(
                 value -> value.stack().getHoverName().getString().toLowerCase(Locale.ROOT));
         Comparator<ProjectedStack> byQuantity = Comparator.comparingLong(ProjectedStack::quantity);
@@ -60,6 +61,8 @@ public final class InventoryProjection {
             case NAME_DESCENDING -> byName.reversed();
             case QUANTITY_ASCENDING -> byQuantity;
             case QUANTITY_DESCENDING -> byQuantity.reversed();
+            case RECENTLY_MODIFIED -> Comparator.comparingLong(
+                    (ProjectedStack value) -> data.recentlyModifiedOrder(value.stack())).reversed();
             case REGISTRY_ID -> byId;
             case MOD_NAMESPACE -> Comparator.comparing(
                     value -> BuiltInRegistries.ITEM.getKey(value.stack().getItem()).getNamespace());

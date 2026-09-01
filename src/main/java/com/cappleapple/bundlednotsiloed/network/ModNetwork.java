@@ -434,7 +434,7 @@ public final class ModNetwork {
 
     private static void transferRecipe(RecipeTransferPayload payload, IPayloadContext context) {
         if (!(context.player() instanceof ServerPlayer player) || !allowAction(player)) return;
-        RecipeTransferService.transfer(player, payload.recipeId(), payload.placeAll());
+        RecipeTransferService.transfer(player, payload.recipeId(), payload.placeAll(), payload.destination());
     }
 
     private static void stowMainGrid(StowMainGridPayload payload, IPayloadContext context) {

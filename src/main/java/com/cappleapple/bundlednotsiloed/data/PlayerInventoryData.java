@@ -24,6 +24,8 @@ public final class PlayerInventoryData implements INBTSerializable<CompoundTag> 
     private final InventorySlotWindow inventoryWindow = new InventorySlotWindow();
     private final PlayerCategoryData categories = new PlayerCategoryData();
     private final HotbarBindings hotbar = new HotbarBindings();
+    private final RecentInventoryChanges recentChanges = new RecentInventoryChanges();
+    private int suppressRecentChangeTracking;
     private boolean migratedVanillaInventory;
     private boolean initializedCapacityBase;
     private SortMode inventorySortPreference = SortMode.NAME_ASCENDING;
@@ -55,6 +57,17 @@ public final class PlayerInventoryData implements INBTSerializable<CompoundTag> 
     public void setNewItemDestination(NewItemDestination value) { newItemDestination = Objects.requireNonNull(value); }
     public boolean autoRefill() { return autoRefill; }
     public void setAutoRefill(boolean value) { autoRefill = value; }
+    public long recentlyModifiedOrder(ItemStack stack) { return recentChanges.order(stack); }
+
+    public void arrangeWithoutRecordingRecentChanges(Runnable arrangement) {
+        suppressRecentChangeTracking++;
+        try {
+            arrangement.run();
+        } finally {
+            suppressRecentChangeTracking--;
+            recentChanges.observe(inventory.backingStacks(), false);
+        }
+    }
 
     public void showInventoryWindow(List<ItemStack> prototypes) {
         inventoryWindow.show(prototypes, inventory);
@@ -110,6 +123,7 @@ public final class PlayerInventoryData implements INBTSerializable<CompoundTag> 
     }
 
     private void onInventoryChanged() {
+        recentChanges.observe(inventory.backingStacks(), suppressRecentChangeTracking == 0);
         syncVanillaCompatibilityView();
         if (owner != null && !owner.level().isClientSide) ModAttachments.markDirty(owner);
     }
@@ -151,6 +165,7 @@ public final class PlayerInventoryData implements INBTSerializable<CompoundTag> 
     public CompoundTag serializeNBT(HolderLookup.Provider provider) {
         CompoundTag root = new CompoundTag();
         root.put("Inventory", inventory.serializeNBT(provider));
+        root.put("RecentInventoryChanges", recentChanges.save(provider));
         root.putBoolean("MigratedVanillaInventory", migratedVanillaInventory);
         root.putBoolean("InitializedCapacityBase", initializedCapacityBase);
         return root;
@@ -159,6 +174,7 @@ public final class PlayerInventoryData implements INBTSerializable<CompoundTag> 
     @Override
     public void deserializeNBT(HolderLookup.Provider provider, CompoundTag root) {
         inventory.deserializeNBT(provider, root.getCompound("Inventory"));
+        recentChanges.load(provider, root.getCompound("RecentInventoryChanges"), inventory.backingStacks());
         // Import pre-0.6.3 customization once so the client can migrate it into BNS-SaveState.json.
         if (root.contains("Categories") || root.contains("Hotbar")) loadCustomization(provider, root);
         migratedVanillaInventory = root.getBoolean("MigratedVanillaInventory");

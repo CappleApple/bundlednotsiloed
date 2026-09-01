@@ -65,4 +65,27 @@ class InventoryProjectionTest {
         assertEquals(Items.DIAMOND_SWORD, data.inventory().syntheticStack(0).getItem());
         assertTrue(data.inventory().validate());
     }
+
+    @Test
+    void recentlyModifiedPlacesTheLatestTouchedIdentityFirstWithoutRewritingHistory() {
+        PlayerInventoryData data = new PlayerInventoryData(null);
+        ArrayList<ItemStack> sparse = new ArrayList<>();
+        for (int slot = 0; slot < 9; slot++) sparse.add(ItemStack.EMPTY);
+        sparse.add(new ItemStack(Items.APPLE, 4));
+        sparse.add(new ItemStack(Items.STONE, 64));
+        data.inventory().loadNetworkSnapshot(sparse, 1);
+        data.inventory().replaceSyntheticSlotFromItemUse(9, new ItemStack(Items.APPLE, 3));
+        data.inventory().replaceSyntheticSlotFromItemUse(10, new ItemStack(Items.STONE, 63));
+        long stoneOrder = data.recentlyModifiedOrder(new ItemStack(Items.STONE));
+        long appleOrder = data.recentlyModifiedOrder(new ItemStack(Items.APPLE));
+        assertTrue(stoneOrder > appleOrder);
+
+        data.setInventorySortPreference(SortMode.RECENTLY_MODIFIED);
+        InventoryProjection.applyExplicitView(data);
+
+        assertEquals(Items.STONE, data.inventory().syntheticStack(9).getItem());
+        assertEquals(Items.APPLE, data.inventory().syntheticStack(10).getItem());
+        assertEquals(stoneOrder, data.recentlyModifiedOrder(new ItemStack(Items.STONE)));
+        assertEquals(appleOrder, data.recentlyModifiedOrder(new ItemStack(Items.APPLE)));
+    }
 }

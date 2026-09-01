@@ -1,5 +1,46 @@
 # Changelog
 
+## 1.3.5 - 2026-09-01
+
+### Fixed
+
+- EMI Shift-click fill and craft-all interactions now retain their native one/all and cursor/inventory destinations while sourcing ingredients from the complete logical inventory through vanilla recipe-placement hooks.
+
+## 1.3.4 - 2026-09-01
+
+### Fixed
+
+- EMI recipe availability and autofill now use the complete logical inventory in Visual Workbench crafting tables instead of only the currently visible player rows.
+
+## 1.3.3 - 2026-09-01
+
+### Fixed
+
+- EMI now recognizes JEMI-wrapped crafting recipes across the complete logical inventory instead of checking only the currently visible player rows.
+
+## 1.3.2 - 2026-08-31
+
+### Added
+
+- Added a Recently Modified sort mode that persists exact item-identity changes while ignoring the rearrangement performed by the sort itself.
+- Item tooltips now append the exact quantity owned across the unified inventory.
+
+### Changed
+
+- The default inventory-search shortcut is now Shift+F instead of F.
+
+### Fixed
+
+- Inventory scrolling now changes the visible slot window while carrying an item, allowing it to be placed in another part of the inventory.
+- Integrated container search bars and controls now render beneath native item tooltips and the cursor-held stack.
+- External-container Shift-clicks now join an existing item identity or follow the selected New items destination and fallback order instead of being forced into stowed storage while the inventory browser is open.
+- Respawning now immediately republishes the logical inventory and sends a full client snapshot, restoring stowed items and the search-bar capacity fill without requiring an inventory click.
+- Expanded category and settings menus now own their popup hover area, preventing covered inventory-item tooltips from rendering or merging with menu tooltips.
+- Player-inventory Shift-clicks now move hotbar stacks into the first available main-inventory slot, falling back to the first available stowed slot; other source stacks still try the hotbar first and then the logical-storage tail.
+- Exact item-count tooltips now label the unified quantity as **Total** instead of **Owned**.
+- Exact item-count tooltips now appear only for items hovered in player main-inventory or hotbar slots, not external containers or other tooltip sources.
+- JEI and EMI recipe autofill now extracts complete stacks from stowed storage without losing the placement count, and remains anchored to logical slots while the inventory is scrolled or filtered.
+
 ## 1.3.1 - 2026-08-31
 
 ### Fixed

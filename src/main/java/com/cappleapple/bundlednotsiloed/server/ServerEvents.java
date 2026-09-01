@@ -65,6 +65,19 @@ public final class ServerEvents {
         replacement.loadCustomization(event.getEntity().registryAccess(), original.saveCustomization(event.getOriginal().registryAccess()));
     }
 
+    @SubscribeEvent
+    public static void playerRespawn(PlayerEvent.PlayerRespawnEvent event) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        PlayerInventoryData data = player.getData(ModAttachments.PLAYER_DATA);
+        // The replacement player owns a fresh vanilla Inventory and a fresh client attachment.
+        // Republish both views after vanilla has finished replacing the entity, then discard the
+        // old UUID-keyed delta baseline so the new client attachment receives a complete snapshot.
+        data.syncVanillaCompatibilityView();
+        player.inventoryMenu.broadcastFullState();
+        ModNetwork.forget(player.getUUID());
+        ModNetwork.sendInitial(player);
+    }
+
     private static void initializeCapacityBase(ServerPlayer player, PlayerInventoryData data) {
         if (data.initializedCapacityBase()) return;
         AttributeInstance attribute = player.getAttribute(ModAttributes.INVENTORY_CAPACITY);

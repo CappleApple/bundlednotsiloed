@@ -56,8 +56,10 @@ public abstract class InventoryMixin {
 
     @Inject(method = "getItem", at = @At("HEAD"), cancellable = true)
     private void sns$getItem(int slot, CallbackInfoReturnable<ItemStack> callback) {
-        if (sns$active() && slot == BNS_VIRTUAL_BACKEND_SLOT && sns$recipeBackingSlot >= Inventory.INVENTORY_SIZE) {
-            callback.setReturnValue(sns$data().inventory().vanillaStackReference(sns$recipeBackingSlot));
+        if (sns$active() && slot == BNS_VIRTUAL_BACKEND_SLOT && sns$recipeBackingSlot >= 0) {
+            // ServerPlaceRecipe reads this reference again after removing the source stack. A
+            // snapshot preserves the pre-removal count when the complete logical stack is used.
+            callback.setReturnValue(sns$data().inventory().syntheticStack(sns$recipeBackingSlot));
             return;
         }
         if (sns$active() && slot >= 0 && slot < Inventory.INVENTORY_SIZE) {
@@ -140,7 +142,7 @@ public abstract class InventoryMixin {
 
     @Inject(method = "removeItem", at = @At("HEAD"), cancellable = true)
     private void sns$removeItem(int slot, int amount, CallbackInfoReturnable<ItemStack> callback) {
-        if (sns$active() && slot == BNS_VIRTUAL_BACKEND_SLOT && sns$recipeBackingSlot >= Inventory.INVENTORY_SIZE) {
+        if (sns$active() && slot == BNS_VIRTUAL_BACKEND_SLOT && sns$recipeBackingSlot >= 0) {
             int backingSlot = sns$recipeBackingSlot;
             sns$recipeBackingSlot = -1;
             callback.setReturnValue(sns$data().inventory().extractSyntheticSlot(backingSlot, amount, false));
@@ -153,7 +155,7 @@ public abstract class InventoryMixin {
 
     @Inject(method = "removeItemNoUpdate", at = @At("HEAD"), cancellable = true)
     private void sns$removeItemNoUpdate(int slot, CallbackInfoReturnable<ItemStack> callback) {
-        if (sns$active() && slot == BNS_VIRTUAL_BACKEND_SLOT && sns$recipeBackingSlot >= Inventory.INVENTORY_SIZE) {
+        if (sns$active() && slot == BNS_VIRTUAL_BACKEND_SLOT && sns$recipeBackingSlot >= 0) {
             int backingSlot = sns$recipeBackingSlot;
             sns$recipeBackingSlot = -1;
             callback.setReturnValue(sns$data().inventory().extractSyntheticSlot(backingSlot, Integer.MAX_VALUE, false));
@@ -207,11 +209,10 @@ public abstract class InventoryMixin {
             ItemStack stored = stacks.get(index);
             if (stored.isEmpty() || !ItemStack.isSameItemSameComponents(stack, stored)
                     || stored.isDamaged() || stored.isEnchanted() || stored.has(DataComponents.CUSTOM_NAME)) continue;
-            if (index < Inventory.INVENTORY_SIZE) callback.setReturnValue(index);
-            else {
-                sns$recipeBackingSlot = index;
-                callback.setReturnValue(BNS_VIRTUAL_BACKEND_SLOT);
-            }
+            // This method is consumed by ServerPlaceRecipe. Keep its source anchored to the
+            // logical backing index instead of whichever vanilla slot currently displays it.
+            sns$recipeBackingSlot = index;
+            callback.setReturnValue(BNS_VIRTUAL_BACKEND_SLOT);
             return;
         }
         callback.setReturnValue(-1);

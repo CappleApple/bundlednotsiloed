@@ -1,6 +1,7 @@
 package com.cappleapple.bundlednotsiloed.compat.jei;
 
 import com.cappleapple.bundlednotsiloed.BundledNotSiloed;
+import com.cappleapple.bundlednotsiloed.compat.RecipeTransferDestination;
 import com.cappleapple.bundlednotsiloed.data.ModAttachments;
 import com.cappleapple.bundlednotsiloed.network.RecipeTransferPayload;
 import java.util.List;
@@ -85,7 +86,8 @@ public final class BundledNotSiloedJeiPlugin implements IModPlugin {
                         recipeSlots.getSlotViews(RecipeIngredientRole.INPUT));
             }
 
-            if (doTransfer) PacketDistributor.sendToServer(new RecipeTransferPayload(recipe.id(), maxTransfer));
+            if (doTransfer) PacketDistributor.sendToServer(new RecipeTransferPayload(
+                    recipe.id(), maxTransfer, RecipeTransferDestination.NONE));
             return null;
         }
     }

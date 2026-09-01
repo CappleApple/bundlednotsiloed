@@ -1,5 +1,7 @@
 package com.cappleapple.bundlednotsiloed.compat.emi;
 
+import com.cappleapple.bundlednotsiloed.BundledNotSiloed;
+import com.cappleapple.bundlednotsiloed.compat.RecipeTransferDestination;
 import com.cappleapple.bundlednotsiloed.data.ModAttachments;
 import com.cappleapple.bundlednotsiloed.network.RecipeTransferPayload;
 import dev.emi.emi.api.EmiEntrypoint;
@@ -16,10 +18,14 @@ import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.inventory.CraftingMenu;
 import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.inventory.MenuType;
+import net.minecraft.world.inventory.RecipeBookMenu;
 import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.entity.player.StackedContents;
 import net.minecraft.world.item.crafting.CraftingRecipe;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -27,14 +33,33 @@ import net.neoforged.neoforge.network.PacketDistributor;
 /** Supplies complete logical-inventory crafting data to EMI's native screen integration. */
 @EmiEntrypoint
 public final class BundledNotSiloedEmiPlugin implements EmiPlugin {
+    private static final List<ResourceLocation> COMPATIBLE_CRAFTING_MENU_TYPES = List.of(
+            ResourceLocation.fromNamespaceAndPath("visualworkbench", "crafting")
+    );
+
     @Override
     public void register(EmiRegistry registry) {
         BnsInventoryRecipeHandler inventoryHandler = new BnsInventoryRecipeHandler();
         BnsCraftingRecipeHandler craftingHandler = new BnsCraftingRecipeHandler();
         registry.addRecipeHandler((MenuType<InventoryMenu>)null, inventoryHandler);
-        registry.addRecipeHandler(MenuType.CRAFTING, craftingHandler);
         prioritize((MenuType<?>)null, inventoryHandler);
-        prioritize(MenuType.CRAFTING, craftingHandler);
+        registerCraftingHandler(registry, MenuType.CRAFTING, craftingHandler);
+        for (ResourceLocation id : COMPATIBLE_CRAFTING_MENU_TYPES) {
+            BuiltInRegistries.MENU.getOptional(id).ifPresent(menuType -> {
+                // Visual Workbench subclasses CraftingMenu but returns its own MenuType.
+                // EMI dispatches by that type rather than by the menu's Java superclass.
+                @SuppressWarnings("unchecked")
+                MenuType<CraftingMenu> compatibleType = (MenuType<CraftingMenu>)(MenuType<?>)menuType;
+                registerCraftingHandler(registry, compatibleType, craftingHandler);
+                BundledNotSiloed.LOGGER.info("Registered full-inventory EMI crafting handler for {}", id);
+            });
+        }
+    }
+
+    private static void registerCraftingHandler(EmiRegistry registry, MenuType<CraftingMenu> menuType,
+                                                BnsCraftingRecipeHandler handler) {
+        registry.addRecipeHandler(menuType, handler);
+        prioritize(menuType, handler);
     }
 
     /** EMI keeps the first supporting handler; BNS must precede its vanilla click-based handlers. */
@@ -56,19 +81,38 @@ public final class BundledNotSiloedEmiPlugin implements EmiPlugin {
         return new EmiPlayerInventory(stacks);
     }
 
-    private static boolean transferable(EmiRecipe recipe) {
+    private static boolean transferable(EmiRecipe recipe, int gridWidth, int gridHeight) {
         RecipeHolder<?> backing = recipe.getBackingRecipe();
-        return backing != null && backing.value() instanceof CraftingRecipe;
+        return backing != null && backing.value() instanceof CraftingRecipe craftingRecipe
+                && craftingRecipe.canCraftInDimensions(gridWidth, gridHeight);
     }
 
     private static boolean canCraft(EmiRecipe recipe, EmiCraftContext<?> context) {
-        return context.getInventory().canCraft(recipe, Math.max(1, context.getAmount()));
+        RecipeHolder<?> backing = recipe.getBackingRecipe();
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null || backing == null
+                || !(backing.value() instanceof CraftingRecipe craftingRecipe)
+                || !(context.getScreenHandler() instanceof RecipeBookMenu<?, ?> recipeMenu)) return false;
+
+        // Match EMI's StandardRecipeHandler semantics: canCraft answers whether one batch is
+        // possible. EMI uses Integer.MAX_VALUE to request "all" and caps the actual placement
+        // later; treating that sentinel as a required craft count rejects every Shift-click.
+        StackedContents contents = new StackedContents();
+        minecraft.player.getInventory().fillStackedContents(contents);
+        recipeMenu.fillCraftSlotsStackedContents(contents);
+        return contents.canCraft(craftingRecipe, null);
     }
 
     private static boolean transfer(EmiRecipe recipe, EmiCraftContext<?> context) {
         RecipeHolder<?> backing = recipe.getBackingRecipe();
         if (backing == null || !(backing.value() instanceof CraftingRecipe)) return false;
-        PacketDistributor.sendToServer(new RecipeTransferPayload(backing.id(), context.getAmount() > 1));
+        RecipeTransferDestination destination = switch (context.getDestination()) {
+            case NONE -> RecipeTransferDestination.NONE;
+            case CURSOR -> RecipeTransferDestination.CURSOR;
+            case INVENTORY -> RecipeTransferDestination.INVENTORY;
+        };
+        PacketDistributor.sendToServer(new RecipeTransferPayload(
+                backing.id(), context.getAmount() > 1, destination));
         return true;
     }
 
@@ -78,7 +122,11 @@ public final class BundledNotSiloedEmiPlugin implements EmiPlugin {
         }
 
         @Override public boolean supportsRecipe(EmiRecipe recipe) {
-            return transferable(recipe) && super.supportsRecipe(recipe);
+            // JEMI wraps some ordinary CraftingRecipes in a JEI-owned category instead of
+            // VanillaEmiRecipeCategories.CRAFTING. The authoritative backing recipe and its
+            // dimensions decide support; requiring EMI's category would fall back to the
+            // visible-slot-only JEMI transfer handler.
+            return transferable(recipe, 2, 2);
         }
 
         @Override public boolean canCraft(EmiRecipe recipe, EmiCraftContext<InventoryMenu> context) {
@@ -96,7 +144,7 @@ public final class BundledNotSiloedEmiPlugin implements EmiPlugin {
         }
 
         @Override public boolean supportsRecipe(EmiRecipe recipe) {
-            return transferable(recipe) && super.supportsRecipe(recipe);
+            return transferable(recipe, 3, 3);
         }
 
         @Override public boolean canCraft(EmiRecipe recipe, EmiCraftContext<CraftingMenu> context) {

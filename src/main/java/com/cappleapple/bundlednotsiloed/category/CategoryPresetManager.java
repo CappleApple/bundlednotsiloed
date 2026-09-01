@@ -143,6 +143,7 @@ public final class CategoryPresetManager {
             case "name_descending" -> SortMode.NAME_DESCENDING;
             case "quantity", "quantity_descending" -> SortMode.QUANTITY_DESCENDING;
             case "quantity_ascending" -> SortMode.QUANTITY_ASCENDING;
+            case "recent", "recently_modified" -> SortMode.RECENTLY_MODIFIED;
             case "registry", "registry_id" -> SortMode.REGISTRY_ID;
             case "namespace", "mod_namespace" -> SortMode.MOD_NAMESPACE;
             default -> throw new IllegalArgumentException("Unknown sort mode: " + value);

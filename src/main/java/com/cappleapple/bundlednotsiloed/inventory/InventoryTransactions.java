@@ -95,7 +95,11 @@ public final class InventoryTransactions {
         return new InsertionResult(stack.getCount(), accepted, remainder, result.capacityConsumed(), reason);
     }
 
-    /** Manual container transfer using the visible main-grid/hotbar order before backend overflow. */
+    /**
+     * Manual container transfer which joins an existing identity wherever it already lives. A
+     * brand-new identity follows the player's selected new-item destination and its fallback
+     * order before overflowing into stowed storage.
+     */
     public static InsertionResult insertInPlayerTransferOrder(Player player, ItemStack stack, boolean simulate) {
         PlayerInventoryData data = player.getData(ModAttachments.PLAYER_DATA);
         DynamicCapacityInventory inventory = data.inventory();
@@ -107,7 +111,8 @@ public final class InventoryTransactions {
             return new InsertionResult(stack.getCount(), 0, stack.copy(), 0, InsertionRejection.CATEGORY_LIMIT);
         }
         ItemStack limited = allowed == stack.getCount() ? stack : stack.copyWithCount(allowed);
-        InsertionResult result = inventory.insertInPlayerTransferOrder(limited, simulate);
+        InsertionResult result = WorldPickupInsertion.insert(
+                inventory, limited, data.newItemDestination(), simulate);
         int accepted = result.acceptedAmount();
         ItemStack remainder = accepted == stack.getCount() ? ItemStack.EMPTY : stack.copyWithCount(stack.getCount() - accepted);
         InsertionRejection reason = accepted < allowed ? result.rejection()

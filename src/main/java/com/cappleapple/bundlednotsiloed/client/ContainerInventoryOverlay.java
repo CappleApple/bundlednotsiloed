@@ -34,6 +34,7 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.neoforged.neoforge.client.event.ContainerScreenEvent;
 import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.lwjgl.glfw.GLFW;
@@ -96,8 +97,9 @@ public final class ContainerInventoryOverlay {
         if (screen == activeScreen) restoreActiveScreen();
     }
 
-    public static void render(ScreenEvent.Render.Post event) {
-        if (!(event.getScreen() instanceof AbstractContainerScreen<?> screen) || !supports(screen)) return;
+    public static void render(ContainerScreenEvent.Render.Foreground event) {
+        AbstractContainerScreen<?> screen = event.getContainerScreen();
+        if (!supports(screen)) return;
         prepare(screen);
         if (activeGrid == null || Minecraft.getInstance().player == null) return;
         ensureInventoryWindow(false);
@@ -107,17 +109,23 @@ public final class ContainerInventoryOverlay {
         hoveredTooltip = List.of();
         GuiGraphics graphics = event.getGuiGraphics();
         graphics.pose().pushPose();
-        graphics.pose().translate(0, 0, 400);
+        // This event inherits the container's GUI-local pose while the overlay uses screen coordinates.
+        // Keep the controls below vanilla's later tooltip and cursor-held stack passes.
+        graphics.pose().translate(-screen.getGuiLeft(), -screen.getGuiTop(), 100);
         renderToolbar(graphics, event.getMouseX(), event.getMouseY());
         renderEntries(graphics, event.getMouseX(), event.getMouseY());
         graphics.pose().popPose();
 
         graphics.pose().pushPose();
-        graphics.pose().translate(0, 0, 800);
+        graphics.pose().translate(-screen.getGuiLeft(), -screen.getGuiTop(), 200);
         if (categoryMenuOpen) renderCategoryMenu(graphics, event.getMouseX(), event.getMouseY());
         else if (settingsMenuOpen) renderSettingsMenu(graphics, event.getMouseX(), event.getMouseY());
         graphics.pose().popPose();
+    }
 
+    public static void renderTooltip(ScreenEvent.Render.Post event) {
+        if (event.getScreen() != activeScreen || activeGrid == null) return;
+        GuiGraphics graphics = event.getGuiGraphics();
         graphics.pose().pushPose();
         graphics.pose().translate(0, 0, 1000);
         if (hoveredEntry != null && !categoryMenuOpen && !settingsMenuOpen) {
@@ -401,6 +409,16 @@ public final class ContainerInventoryOverlay {
     public static boolean replacesSlot(AbstractContainerScreen<?> screen, Slot slot) {
         return identityWindow && screen == activeScreen && activeGrid != null
                 && activeGrid.cells().stream().anyMatch(cell -> cell.slot() == slot);
+    }
+
+    /** True when an expanded integrated menu owns this position instead of a covered native slot. */
+    public static boolean expandedMenuCovers(
+            AbstractContainerScreen<?> screen, double mouseX, double mouseY
+    ) {
+        if (screen != activeScreen || activeGrid == null) return false;
+        return ExpandedMenuHoverPolicy.blocksUnderlyingSlot(
+                categoryMenuOpen, activeGrid.categoryPopupContains(mouseX, mouseY),
+                settingsMenuOpen, activeGrid.settingsPopupContains(mouseX, mouseY));
     }
 
     private static void renderToolbar(GuiGraphics graphics, int mouseX, int mouseY) {
@@ -726,7 +744,10 @@ public final class ContainerInventoryOverlay {
     private static void ensureInventoryWindow(boolean force) {
         Minecraft minecraft = Minecraft.getInstance();
         if (activeGrid == null || minecraft.player == null || minecraft.getConnection() == null) return;
-        if (!minecraft.player.containerMenu.getCarried().isEmpty() && appliedWindowRevision >= 0) return;
+        if (!InventoryWindowUpdatePolicy.shouldApply(
+                !minecraft.player.containerMenu.getCarried().isEmpty(),
+                windowDirty,
+                appliedWindowRevision >= 0)) return;
         var data = minecraft.player.getData(ModAttachments.PLAYER_DATA);
         boolean identityView = usesIdentityView();
         List<LogicalInventoryEntry> values = identityView ? entries() : List.of();

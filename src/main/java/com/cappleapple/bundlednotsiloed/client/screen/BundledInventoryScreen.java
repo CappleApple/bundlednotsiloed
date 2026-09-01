@@ -6,11 +6,13 @@ import com.cappleapple.bundlednotsiloed.category.SortMode;
 import com.cappleapple.bundlednotsiloed.client.CategoryGridLayout;
 import com.cappleapple.bundlednotsiloed.client.ClientKeyMappings;
 import com.cappleapple.bundlednotsiloed.client.ClientTooltipSearchIndex;
+import com.cappleapple.bundlednotsiloed.client.ExpandedMenuHoverPolicy;
 import com.cappleapple.bundlednotsiloed.client.InventoryBrowserControls;
 import com.cappleapple.bundlednotsiloed.client.InventoryBrowserControls.CategoryOption;
 import com.cappleapple.bundlednotsiloed.client.InventoryCountFormatter;
 import com.cappleapple.bundlednotsiloed.client.InventorySearchBar;
 import com.cappleapple.bundlednotsiloed.client.InventoryScreenLayout;
+import com.cappleapple.bundlednotsiloed.client.InventoryWindowUpdatePolicy;
 import com.cappleapple.bundlednotsiloed.client.ItemSearchExpression;
 import com.cappleapple.bundlednotsiloed.config.ClientConfig;
 import com.cappleapple.bundlednotsiloed.data.InventorySlotWindow;
@@ -609,6 +611,15 @@ public final class BundledInventoryScreen extends InventoryScreen {
                 SETTINGS_POPUP_X, SETTINGS_POPUP_Y, SETTINGS_POPUP_WIDTH, SETTINGS_POPUP_HEIGHT);
     }
 
+    /** True when an expanded menu, rather than a covered native slot, owns this screen position. */
+    public boolean expandedMenuCovers(double mouseX, double mouseY) {
+        double localX = mouseX - this.leftPos;
+        double localY = mouseY - this.topPos;
+        return ExpandedMenuHoverPolicy.blocksUnderlyingSlot(
+                categoryMenuOpen, insideCategoryPopup(localX, localY),
+                settingsMenuOpen, insideSettingsPopup(localX, localY));
+    }
+
     private void updateSearch(String value) {
         query = value;
         ItemSearchExpression search = ItemSearchExpression.parse(value);
@@ -702,7 +713,8 @@ public final class BundledInventoryScreen extends InventoryScreen {
     private void ensureInventoryWindow() {
         if (!browserStateSent || minecraft.getConnection() == null) return;
         var data = player.getData(ModAttachments.PLAYER_DATA);
-        if (!this.menu.getCarried().isEmpty() && appliedWindowRevision >= 0) return;
+        if (!InventoryWindowUpdatePolicy.shouldApply(
+                !this.menu.getCarried().isEmpty(), windowDirty, appliedWindowRevision >= 0)) return;
         boolean identityView = usesIdentityView();
         List<LogicalInventoryEntry> values = identityView ? entries() : List.of();
         int entryCount = identityView ? values.size() : visibleEntryCount();

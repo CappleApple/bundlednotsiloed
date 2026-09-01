@@ -97,7 +97,8 @@ class InventoryPayloadCodecTest {
                     new NewItemDestinationPayload(NewItemDestination.STOWED_FIRST));
             AutoRefillPayload.STREAM_CODEC.encode(buffer, new AutoRefillPayload(true));
             ResourceLocation recipeId = ResourceLocation.fromNamespaceAndPath("minecraft", "wooden_pickaxe");
-            RecipeTransferPayload.STREAM_CODEC.encode(buffer, new RecipeTransferPayload(recipeId, true));
+            RecipeTransferPayload.STREAM_CODEC.encode(buffer, new RecipeTransferPayload(
+                    recipeId, true, com.cappleapple.bundlednotsiloed.compat.RecipeTransferDestination.INVENTORY));
             buffer.readerIndex(0);
             assertNotNull(StowMainGridPayload.STREAM_CODEC.decode(buffer));
             assertEquals(-1, StowSlotPayload.STREAM_CODEC.decode(buffer).slot());
@@ -107,6 +108,8 @@ class InventoryPayloadCodecTest {
             RecipeTransferPayload transfer = RecipeTransferPayload.STREAM_CODEC.decode(buffer);
             assertEquals(recipeId, transfer.recipeId());
             assertTrue(transfer.placeAll());
+            assertEquals(com.cappleapple.bundlednotsiloed.compat.RecipeTransferDestination.INVENTORY,
+                    transfer.destination());
         } finally {
             buffer.release();
         }

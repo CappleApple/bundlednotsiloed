@@ -1,6 +1,7 @@
 package com.cappleapple.bundlednotsiloed.mixin;
 
 import com.cappleapple.bundlednotsiloed.data.ModAttachments;
+import com.cappleapple.bundlednotsiloed.inventory.PlayerInventoryQuickMove;
 import com.cappleapple.bundlednotsiloed.network.ModNetwork;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
@@ -12,11 +13,11 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/** Gives an open browser native QUICK_MOVE semantics from the visible player grid into backend storage. */
+/** Gives the open player browser its hotbar-first QUICK_MOVE placement order. */
 @Mixin(InventoryMenu.class)
 public abstract class InventoryMenuMixin {
     @Inject(method = "quickMoveStack", at = @At("HEAD"), cancellable = true)
-    private void sns$stowVisibleStack(Player player, int menuIndex, CallbackInfoReturnable<ItemStack> callback) {
+    private void sns$quickMoveVisibleStack(Player player, int menuIndex, CallbackInfoReturnable<ItemStack> callback) {
         if (!ModNetwork.isBrowserOpen(player)
                 || !player.getData(ModAttachments.PLAYER_DATA).migratedVanillaInventory()) return;
 
@@ -36,7 +37,8 @@ public abstract class InventoryMenuMixin {
         ItemStack original = source.copy();
         int logicalSlot = player.getData(ModAttachments.PLAYER_DATA)
                 .inventoryWindow().logicalIndex(inventorySlot);
-        if (!player.getData(ModAttachments.PLAYER_DATA).inventory().stowSyntheticSlot(logicalSlot)) return;
+        if (!PlayerInventoryQuickMove.move(
+                player.getData(ModAttachments.PLAYER_DATA).inventory(), logicalSlot)) return;
         menu.broadcastChanges();
         callback.setReturnValue(original);
     }

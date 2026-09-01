@@ -3,9 +3,11 @@ package com.cappleapple.bundlednotsiloed.client;
 import com.cappleapple.bundlednotsiloed.config.ClientConfig;
 import com.cappleapple.bundlednotsiloed.client.screen.BundledInventoryScreen;
 import com.cappleapple.bundlednotsiloed.data.ModAttachments;
+import com.cappleapple.bundlednotsiloed.inventory.ExactItemInventoryCount;
 import com.cappleapple.bundlednotsiloed.network.AutoRefillPayload;
 import com.cappleapple.bundlednotsiloed.network.HotbarCyclePayload;
 import com.cappleapple.bundlednotsiloed.network.BulkTransferPayload;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
@@ -19,10 +21,23 @@ import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.ContainerScreenEvent;
 import net.neoforged.neoforge.client.event.RenderGuiEvent;
 import net.neoforged.neoforge.client.event.ScreenEvent;
+import net.neoforged.neoforge.event.entity.player.ItemTooltipEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 public final class ClientEvents {
     private ClientEvents() {}
+
+    @SubscribeEvent
+    public static void appendExactInventoryCount(ItemTooltipEvent event) {
+        if (event.getEntity() == null || event.getItemStack().isEmpty()
+                || !InventoryItemTooltipContext.isPlayerStorageTooltip(
+                        event.getEntity().getInventory(), event.getItemStack())) return;
+        long count = ExactItemInventoryCount.count(
+                event.getEntity().getData(ModAttachments.PLAYER_DATA).inventory(),
+                event.getItemStack());
+        event.getToolTip().add(Component.translatable(
+                "tooltip.bundlednotsiloed.exact_inventory_count", count).withStyle(ChatFormatting.GRAY));
+    }
 
     @SubscribeEvent
     public static void playerLoggingIn(ClientPlayerNetworkEvent.LoggingIn event) {
@@ -133,8 +148,13 @@ public final class ClientEvents {
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void renderContainerOverlay(ScreenEvent.Render.Post event) {
+    public static void renderContainerOverlay(ContainerScreenEvent.Render.Foreground event) {
         ContainerInventoryOverlay.render(event);
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void renderContainerTooltips(ScreenEvent.Render.Post event) {
+        ContainerInventoryOverlay.renderTooltip(event);
         renderCycleOverlay(event.getGuiGraphics());
     }
 
