@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.4 - 2026-09-03
+
+### Added
+
+- Added one attached creative-tab-style rail with vertically stacked search, category, and settings controls to the player inventory and compatible container screens.
+
+### Changed
+
+- Search is now activated from an icon button, expands its translucent query display to the right while typing, retains focus across empty GUI space, resumes typing when an active-query button is hovered, blinks while a query remains active, clears on right-click, and resets when the inventory or container closes.
+- The player inventory keeps its vanilla dimensions and slot margins, while capacity changes briefly display a centered two-pixel green-to-orange-to-red gradient between the main inventory and hotbar.
+- The attached control rail sits flush with the inventory panel, while the conditional scrollbar and transient capacity overlay are visually centered in their native margins.
+- Compact control-button tooltips now open to the cursor's left, while expanded Shift help retains Minecraft's normal tooltip placement.
+
+### Fixed
+
+- Sophisticated Backpacks now discovers backpacks throughout the complete logical inventory and keeps an opened backpack bound to its stable logical slot while the inventory browser scrolls.
+- Container player-inventory discovery now recognizes standard NeoForge item-handler wrappers generically, restoring the complete BNS interface in Iron Furnaces and other wrapped 9-by-3 inventories.
+- Container category and settings menus now share the player-grid left edge and render above container items, held stacks, and native tooltips.
+- Removed the visible seam between the attached control rail and the inventory panel.
+- Active search typing now captures keyboard input and suppresses unrelated keybind activation until typing focus ends.
+- Escape now exits search typing without immediately reactivating it while the cursor remains over the search button.
+- Search-filtered inventory items now use Minecraft's native tooltip pass without rendering a duplicate tooltip on top.
+
 ## 1.3.5 - 2026-09-01
 
 ### Fixed

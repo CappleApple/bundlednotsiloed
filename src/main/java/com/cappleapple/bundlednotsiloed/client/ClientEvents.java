@@ -174,6 +174,14 @@ public final class ClientEvents {
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void keyPlayerInventorySearch(ScreenEvent.KeyPressed.Pre event) {
+        if (event.getScreen() instanceof BundledInventoryScreen screen
+                && screen.captureSearchKeyPressed(event.getKeyCode(), event.getScanCode())) {
+            event.setCanceled(true);
+        }
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void keyContainerOverlay(ScreenEvent.KeyPressed.Pre event) {
         ContainerInventoryOverlay.keyPressed(event);
     }

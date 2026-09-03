@@ -1,27 +1,27 @@
 package com.cappleapple.bundlednotsiloed.client;
 
-/** Minimal text-editing state for the topmost browser search field. */
-final class BrowserSearchQuery {
+/** Minimal text-editing state shared by the compact inventory search controls. */
+public final class BrowserSearchQuery {
     private final int maximumLength;
     private String value = "";
     private boolean allSelected;
 
-    BrowserSearchQuery(int maximumLength) {
+    public BrowserSearchQuery(int maximumLength) {
         this.maximumLength = maximumLength;
     }
 
-    String value() { return value; }
-    boolean allSelected() { return allSelected && !value.isEmpty(); }
+    public String value() { return value; }
+    public boolean allSelected() { return allSelected && !value.isEmpty(); }
 
-    void selectAll() {
+    public void selectAll() {
         allSelected = !value.isEmpty();
     }
 
-    void clearSelection() {
+    public void clearSelection() {
         allSelected = false;
     }
 
-    boolean clear() {
+    public boolean clear() {
         if (value.isEmpty()) {
             allSelected = false;
             return false;
@@ -31,7 +31,7 @@ final class BrowserSearchQuery {
         return true;
     }
 
-    boolean backspace() {
+    public boolean backspace() {
         if (allSelected()) return clear();
         if (value.isEmpty()) return false;
         int previous = value.offsetByCodePoints(value.length(), -1);
@@ -39,11 +39,11 @@ final class BrowserSearchQuery {
         return true;
     }
 
-    boolean deleteSelection() {
+    public boolean deleteSelection() {
         return allSelected() && clear();
     }
 
-    boolean append(int codePoint) {
+    public boolean append(int codePoint) {
         if (!Character.isValidCodePoint(codePoint) || Character.isISOControl(codePoint)) return false;
         String appended = new String(Character.toChars(codePoint));
         String base = allSelected() ? "" : value;

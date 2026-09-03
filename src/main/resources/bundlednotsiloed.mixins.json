@@ -17,6 +17,7 @@
     "AbstractContainerScreenMixin",
     "CreativeModeInventoryScreenMixin",
     "GuiMixin",
+    "KeyMappingMixin",
     "MouseHandlerMixin",
     "SlotAccessor"
   ],

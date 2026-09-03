@@ -45,22 +45,24 @@ import org.lwjgl.glfw.GLFW;
  */
 public final class ContainerInventoryOverlay {
     private static final int MAX_QUERY = 96;
-    private static final int SEARCH_GAP = 15;
-    private static final int SCROLLBAR_WIDTH = 3;
+    private static final int SCROLLBAR_WIDTH = 2;
     private static final int CATEGORY_POPUP_ROWS = 4;
     private static final int CATEGORY_POPUP_HEIGHT =
             CATEGORY_POPUP_ROWS * InventoryScreenLayout.CELL_SIZE;
-    private static final int SETTINGS_POPUP_OFFSET_X = 48;
     private static final int SETTINGS_POPUP_WIDTH = 112;
     private static final int SETTINGS_ROW_HEIGHT = 18;
     private static final int SETTINGS_POPUP_HEIGHT = SETTINGS_ROW_HEIGHT * 3 + 2;
     private static final ResourceLocation INVENTORY_TEXTURE =
             ResourceLocation.withDefaultNamespace("textures/gui/container/inventory.png");
     private static final BrowserSearchQuery SEARCH = new BrowserSearchQuery(MAX_QUERY);
+    private static final InventoryCapacityPulse CAPACITY_PULSE = new InventoryCapacityPulse();
 
     private static AbstractContainerScreen<?> activeScreen;
     private static PlayerGrid activeGrid;
     private static boolean searchFocused;
+    private static boolean searchHoverRefocusArmed = true;
+    private static double searchFocusMouseX;
+    private static double searchFocusMouseY;
     private static boolean categoryMenuOpen;
     private static boolean settingsMenuOpen;
     private static int suppressedTypedKey = GLFW.GLFW_KEY_UNKNOWN;
@@ -112,31 +114,29 @@ public final class ContainerInventoryOverlay {
         // This event inherits the container's GUI-local pose while the overlay uses screen coordinates.
         // Keep the controls below vanilla's later tooltip and cursor-held stack passes.
         graphics.pose().translate(-screen.getGuiLeft(), -screen.getGuiTop(), 100);
-        renderToolbar(graphics, event.getMouseX(), event.getMouseY());
         renderEntries(graphics, event.getMouseX(), event.getMouseY());
+        renderToolbar(graphics, event.getMouseX(), event.getMouseY());
         graphics.pose().popPose();
 
-        graphics.pose().pushPose();
-        graphics.pose().translate(-screen.getGuiLeft(), -screen.getGuiTop(), 200);
-        if (categoryMenuOpen) renderCategoryMenu(graphics, event.getMouseX(), event.getMouseY());
-        else if (settingsMenuOpen) renderSettingsMenu(graphics, event.getMouseX(), event.getMouseY());
-        graphics.pose().popPose();
     }
 
     public static void renderTooltip(ScreenEvent.Render.Post event) {
         if (event.getScreen() != activeScreen || activeGrid == null) return;
         GuiGraphics graphics = event.getGuiGraphics();
         graphics.pose().pushPose();
+        graphics.pose().translate(0, 0, 900);
+        if (categoryMenuOpen) renderCategoryMenu(graphics, event.getMouseX(), event.getMouseY());
+        else if (settingsMenuOpen) renderSettingsMenu(graphics, event.getMouseX(), event.getMouseY());
+        graphics.pose().popPose();
+
+        graphics.pose().pushPose();
         graphics.pose().translate(0, 0, 1000);
-        if (hoveredEntry != null && !categoryMenuOpen && !settingsMenuOpen) {
-            graphics.renderTooltip(Minecraft.getInstance().font, hoveredEntry.representative(),
-                    event.getMouseX(), event.getMouseY());
-        } else if (hoveredCategory != null) {
+        if (hoveredCategory != null) {
             graphics.renderTooltip(Minecraft.getInstance().font, hoveredCategory.name(),
                     event.getMouseX(), event.getMouseY());
-        } else if (!hoveredTooltip.isEmpty()) {
-            graphics.renderComponentTooltip(Minecraft.getInstance().font, hoveredTooltip,
-                    event.getMouseX(), event.getMouseY());
+        } else if (!categoryMenuOpen && !settingsMenuOpen && !hoveredTooltip.isEmpty()) {
+            InventoryButtonTooltipRenderer.render(graphics, Minecraft.getInstance().font,
+                    hoveredTooltip, event.getMouseX(), event.getMouseY(), Screen.hasShiftDown());
         }
         graphics.pose().popPose();
     }
@@ -157,10 +157,20 @@ public final class ContainerInventoryOverlay {
         double mouseX = scaledMouseX(minecraft);
         double mouseY = scaledMouseY(minecraft);
 
+        if (activeGrid.searchContains(mouseX, mouseY)) {
+            consumedReleaseButton = button;
+            if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
+                updateSearch(SEARCH.clear());
+                clearSearchFocus();
+            } else if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+                focusSearch(mouseX, mouseY);
+            }
+            return true;
+        }
+
         if (activeGrid.categoryContains(mouseX, mouseY)) {
             consumedReleaseButton = button;
-            searchFocused = false;
-            SEARCH.clearSelection();
+            clearSearchFocus();
             if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && Screen.hasShiftDown()) {
                 PacketDistributor.sendToServer(new StowMainGridPayload());
                 categoryMenuOpen = false;
@@ -177,8 +187,7 @@ public final class ContainerInventoryOverlay {
         }
         if (activeGrid.settingsContains(mouseX, mouseY)) {
             consumedReleaseButton = button;
-            searchFocused = false;
-            SEARCH.clearSelection();
+            clearSearchFocus();
             settingsMenuOpen = !settingsMenuOpen;
             categoryMenuOpen = false;
             return true;
@@ -208,15 +217,7 @@ public final class ContainerInventoryOverlay {
             settingsMenuOpen = false;
         }
 
-        if (activeGrid.searchContains(mouseX, mouseY)) {
-            consumedReleaseButton = button;
-            searchFocused = true;
-            if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) updateSearch(SEARCH.clear());
-            else SEARCH.clearSelection();
-            return true;
-        }
-        searchFocused = false;
-        SEARCH.clearSelection();
+        clearSearchFocus();
         int visibleEntryCount = visibleEntryCount();
         if (maximumScrollRow(visibleEntryCount) > 0 && activeGrid.scrollbarContains(mouseX, mouseY)) {
             consumedReleaseButton = button;
@@ -294,10 +295,8 @@ public final class ContainerInventoryOverlay {
         InputConstants.Key pressed = InputConstants.getKey(event.getKeyCode(), event.getScanCode());
         if (!searchFocused && ClientKeyMappings.SEARCH_BROWSER.isActiveAndMatches(pressed)) {
             suppressedTypedKey = event.getKeyCode();
-            searchFocused = true;
-            categoryMenuOpen = false;
-            settingsMenuOpen = false;
-            updateSearch(SEARCH.clear());
+            Minecraft minecraft = Minecraft.getInstance();
+            focusSearch(scaledMouseX(minecraft), scaledMouseY(minecraft));
             event.setCanceled(true);
             return;
         }
@@ -313,14 +312,17 @@ public final class ContainerInventoryOverlay {
         }
         switch (event.getKeyCode()) {
             case GLFW.GLFW_KEY_ESCAPE -> {
-                searchFocused = false;
-                SEARCH.clearSelection();
+                clearSearchFocus();
             }
             case GLFW.GLFW_KEY_BACKSPACE -> updateSearch(SEARCH.backspace());
             case GLFW.GLFW_KEY_DELETE -> updateSearch(SEARCH.deleteSelection());
-            default -> { return; }
+            default -> { }
         }
         event.setCanceled(true);
+    }
+
+    public static boolean isSearchTyping(Screen screen) {
+        return searchFocused && screen == activeScreen;
     }
 
     public static void keyReleased(ScreenEvent.KeyReleased.Pre event) {
@@ -353,6 +355,7 @@ public final class ContainerInventoryOverlay {
         categoryMenuOpen = false;
         settingsMenuOpen = false;
         identityWindow = false;
+        CAPACITY_PULSE.reset();
         invalidateEntries();
         ensureInventoryWindow(true);
     }
@@ -368,11 +371,17 @@ public final class ContainerInventoryOverlay {
         activeScreen = null;
         activeGrid = null;
         searchFocused = false;
+        searchHoverRefocusArmed = true;
+        SEARCH.clear();
+        CAPACITY_PULSE.reset();
         categoryMenuOpen = false;
         settingsMenuOpen = false;
         hoveredCategory = null;
         hoveredTooltip = List.of();
         consumedReleaseButton = -1;
+        scrollRow = 0;
+        cachedQuery = "";
+        cachedRevision = -1;
         appliedWindowRevision = -1;
         appliedWindowScrollRow = -1;
         appliedWindowIdentity = false;
@@ -385,11 +394,13 @@ public final class ContainerInventoryOverlay {
         if (minecraft.player == null) return null;
         Inventory inventory = minecraft.player.getInventory();
         ArrayList<Cell> cells = new ArrayList<>();
+        boolean[] seen = new boolean[36];
         for (Slot slot : screen.getMenu().slots) {
-            int inventorySlot = slot.getContainerSlot();
-            if (slot.container == inventory && inventorySlot >= 9 && inventorySlot < 36) {
-                cells.add(new Cell(slot, slot.x, slot.y));
-            }
+            int inventorySlot = ContainerPlayerSlotResolver.resolve(slot, inventory);
+            if (inventorySlot < 9 || inventorySlot >= 36) continue;
+            if (seen[inventorySlot]) return null;
+            seen[inventorySlot] = true;
+            cells.add(new Cell(slot, slot.x, slot.y));
         }
         if (cells.size() != InventoryScreenLayout.VISIBLE_ENTRIES) return null;
         cells.sort(Comparator.comparingInt(Cell::y).thenComparingInt(Cell::x));
@@ -424,37 +435,43 @@ public final class ContainerInventoryOverlay {
     private static void renderToolbar(GuiGraphics graphics, int mouseX, int mouseY) {
         Minecraft minecraft = Minecraft.getInstance();
         var data = minecraft.player.getData(ModAttachments.PLAYER_DATA);
-        int x = activeGrid.searchX();
-        int y = activeGrid.searchY();
-        InventorySearchBar.render(graphics, x, y, data.inventory());
-        String query = SEARCH.value();
-        String shown = query.isEmpty() && !searchFocused
-                ? Component.translatable("gui.bundlednotsiloed.search_hint_compact").getString() : query;
-        String visible = minecraft.font.plainSubstrByWidth(shown, InventorySearchBar.WIDTH - 6);
-        boolean valid = ItemSearchExpression.parse(query).valid();
-        if (searchFocused && SEARCH.allSelected()) {
-            graphics.fill(x + 3, y + 2, x + 3 + minecraft.font.width(visible), y + 11, 0xFF2F5F8F);
+        InventorySideRail.Rail rail = activeGrid.rail();
+        rail.renderBackground(graphics);
+        boolean searchHovered = rail.searchContains(mouseX, mouseY);
+        if (!searchHovered) searchHoverRefocusArmed = true;
+        if (InventorySearchBar.shouldRefocus(
+                SEARCH.value(), searchFocused, searchHovered, searchHoverRefocusArmed)) {
+            focusSearch(mouseX, mouseY);
+        } else if (InventorySearchBar.shouldReleaseFocus(searchFocused,
+                mouseX != searchFocusMouseX || mouseY != searchFocusMouseY,
+                searchHovered, isSearchBlockingTarget(mouseX, mouseY))) {
+            clearSearchFocus();
         }
-        graphics.drawString(minecraft.font, visible, x + 3, y + 2,
-                query.isEmpty() ? 0x777777 : valid ? 0x404040 : 0xFF5555, false);
-        if (searchFocused && (System.currentTimeMillis() / 500L) % 2 == 0) {
-            int cursorX = x + 3 + minecraft.font.width(visible);
-            graphics.fill(cursorX, y + 2, cursorX + 1, y + 11, 0xFF404040);
-        }
-
         boolean categoryHovered = activeGrid.categoryContains(mouseX, mouseY);
         boolean settingsHovered = activeGrid.settingsContains(mouseX, mouseY);
+        InventorySearchBar.renderButton(graphics, rail.searchX(), rail.searchY(),
+                InventorySearchBar.shouldHighlight(SEARCH.value(), searchFocused, searchHovered,
+                        System.currentTimeMillis()));
         InventoryBrowserControls.renderButton(graphics,
-                activeGrid.categoryX(), activeGrid.controlY(),
+                rail.categoryX(), rail.categoryY(),
                 Screen.hasShiftDown() ? new ItemStack(Items.STICKY_PISTON)
                         : CategoryIcons.displayStack(InventoryBrowserControls.currentCategory(data)),
                 categoryMenuOpen || categoryHovered);
         InventoryBrowserControls.renderButton(graphics,
-                activeGrid.settingsX(), activeGrid.controlY(),
+                rail.settingsX(), rail.settingsY(),
                 InventoryBrowserControls.configuredIcon(ClientConfig.SETTINGS_ICON.get()),
                 settingsMenuOpen || settingsHovered);
+        if (searchFocused) {
+            InventorySideRail.renderExpandedSearch(graphics, minecraft.font, rail, SEARCH.value(),
+                    SEARCH.allSelected(), ItemSearchExpression.parse(SEARCH.value()).valid(),
+                    (System.currentTimeMillis() / 500L) % 2 == 0);
+        }
+        CAPACITY_PULSE.render(graphics,
+                activeGrid.gridLeft(), activeGrid.gridTop() + activeGrid.gridHeight(),
+                activeGrid.gridWidth(), InventoryScreenLayout.FULLNESS_HEIGHT,
+                data.inventory(), System.currentTimeMillis());
 
-        if (activeGrid.searchContains(mouseX, mouseY)) {
+        if (searchHovered) {
             hoveredTooltip = InventorySearchBar.tooltip(data.inventory(), Screen.hasShiftDown());
         } else if (categoryHovered) {
             CategoryDefinition category = InventoryBrowserControls.currentCategory(data);
@@ -500,6 +517,26 @@ public final class ContainerInventoryOverlay {
             graphics.renderItem(option.icon(), x + 1, y + 1);
             if (hovered) hoveredCategory = option;
         }
+    }
+
+    private static boolean isSearchBlockingTarget(double mouseX, double mouseY) {
+        if (activeGrid == null || activeScreen == null) return false;
+        if (activeGrid.categoryContains(mouseX, mouseY)
+                || activeGrid.settingsContains(mouseX, mouseY)
+                || activeGrid.scrollbarContains(mouseX, mouseY)
+                || (categoryMenuOpen && activeGrid.categoryPopupContains(mouseX, mouseY))
+                || (settingsMenuOpen && activeGrid.settingsPopupContains(mouseX, mouseY))
+                || activeScreen.getChildAt(mouseX, mouseY).isPresent()) {
+            return true;
+        }
+        for (Slot slot : activeScreen.getMenu().slots) {
+            if (InventoryScreenLayout.inside(mouseX, mouseY,
+                    activeScreen.getGuiLeft() + slot.x - 1,
+                    activeScreen.getGuiTop() + slot.y - 1, 18, 18)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void renderSettingsMenu(GuiGraphics graphics, int mouseX, int mouseY) {
@@ -714,6 +751,22 @@ public final class ContainerInventoryOverlay {
         ensureInventoryWindow(true);
     }
 
+    private static void focusSearch(double mouseX, double mouseY) {
+        searchFocused = true;
+        searchHoverRefocusArmed = false;
+        SEARCH.clearSelection();
+        categoryMenuOpen = false;
+        settingsMenuOpen = false;
+        searchFocusMouseX = mouseX;
+        searchFocusMouseY = mouseY;
+    }
+
+    private static void clearSearchFocus() {
+        searchFocused = false;
+        searchHoverRefocusArmed = false;
+        SEARCH.clearSelection();
+    }
+
     private static void invalidateEntries() {
         cachedRevision = -1;
         windowDirty = true;
@@ -797,32 +850,22 @@ public final class ContainerInventoryOverlay {
             int right = cells.stream().mapToInt(Cell::x).max().orElse(cells.getFirst().x()) + 18;
             return right - left;
         }
-        int searchX() { return gridLeft(); }
-        int searchY() { return gridTop() - SEARCH_GAP; }
-        int categoryX() {
-            return searchX() + InventorySearchBar.WIDTH + InventoryBrowserControls.GAP;
-        }
-        int settingsX() {
-            return categoryX() + InventoryBrowserControls.SIZE + InventoryBrowserControls.GAP;
-        }
-        int controlY() { return searchY(); }
+        InventorySideRail.Rail rail() { return InventorySideRail.at(guiLeft, gridTop()); }
         int categoryPopupX() { return gridLeft() - 1; }
         int categoryPopupY() { return gridTop() - 1; }
-        int settingsPopupX() { return gridLeft() + SETTINGS_POPUP_OFFSET_X; }
+        int settingsPopupX() { return gridLeft() - 1; }
         int settingsPopupY() { return gridTop() - 1; }
         int scrollbarX() {
             return guiLeft + cells.stream().mapToInt(Cell::x).max().orElse(cells.getFirst().x()) + 19;
         }
         boolean searchContains(double x, double y) {
-            return InventorySearchBar.contains(x, y, searchX(), searchY());
+            return rail().searchContains(x, y);
         }
         boolean categoryContains(double x, double y) {
-            return InventoryScreenLayout.inside(x, y, categoryX(), controlY(),
-                    InventoryBrowserControls.SIZE, InventoryBrowserControls.SIZE);
+            return rail().categoryContains(x, y);
         }
         boolean settingsContains(double x, double y) {
-            return InventoryScreenLayout.inside(x, y, settingsX(), controlY(),
-                    InventoryBrowserControls.SIZE, InventoryBrowserControls.SIZE);
+            return rail().settingsContains(x, y);
         }
         boolean categoryPopupContains(double x, double y) {
             return InventoryScreenLayout.inside(x, y, categoryPopupX(), categoryPopupY(),

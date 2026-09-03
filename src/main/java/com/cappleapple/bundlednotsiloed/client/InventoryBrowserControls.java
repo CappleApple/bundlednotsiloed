@@ -43,12 +43,18 @@ public final class InventoryBrowserControls {
             ItemStack icon,
             boolean highlighted
     ) {
-        graphics.blitSprite(highlighted ? BUTTON_HIGHLIGHTED : BUTTON, x, y, SIZE, SIZE);
+        renderButtonBackground(graphics, x, y, highlighted);
         graphics.pose().pushPose();
         graphics.pose().translate(x + 1.5F, y + 1.5F, 100.0F);
         graphics.pose().scale(ICON_SCALE, ICON_SCALE, 1.0F);
         graphics.renderItem(icon, 0, 0);
         graphics.pose().popPose();
+    }
+
+    public static void renderButtonBackground(
+            GuiGraphics graphics, int x, int y, boolean highlighted
+    ) {
+        graphics.blitSprite(highlighted ? BUTTON_HIGHLIGHTED : BUTTON, x, y, SIZE, SIZE);
     }
 
     public static List<CategoryOption> categoryOptions(PlayerInventoryData data) {

@@ -3,6 +3,7 @@ package com.cappleapple.bundlednotsiloed;
 import com.mojang.logging.LogUtils;
 import com.cappleapple.bundlednotsiloed.attribute.ModAttributes;
 import com.cappleapple.bundlednotsiloed.compat.PlayerItemHandlerProvider;
+import com.cappleapple.bundlednotsiloed.compat.SophisticatedBackpacksCompatibility;
 import com.cappleapple.bundlednotsiloed.config.ClientConfig;
 import com.cappleapple.bundlednotsiloed.config.CommonConfig;
 import com.cappleapple.bundlednotsiloed.data.ModAttachments;
@@ -26,6 +27,7 @@ public final class BundledNotSiloed {
         ModAttachments.ATTACHMENTS.register(modBus);
         modBus.addListener(ModAttributes::addPlayerAttributes);
         modBus.addListener(PlayerItemHandlerProvider::registerCapabilities);
+        modBus.addListener(SophisticatedBackpacksCompatibility::commonSetup);
         modBus.addListener(ModNetwork::registerPayloads);
 
         container.registerConfig(ModConfig.Type.COMMON, CommonConfig.SPEC, "bundlednotsiloed-common.toml");

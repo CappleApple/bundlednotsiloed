@@ -4,13 +4,18 @@ import com.cappleapple.bundlednotsiloed.category.CategoryDefinition;
 import com.cappleapple.bundlednotsiloed.category.CategoryMatcher;
 import com.cappleapple.bundlednotsiloed.category.SortMode;
 import com.cappleapple.bundlednotsiloed.client.CategoryGridLayout;
+import com.cappleapple.bundlednotsiloed.client.BrowserSearchQuery;
 import com.cappleapple.bundlednotsiloed.client.ClientKeyMappings;
 import com.cappleapple.bundlednotsiloed.client.ClientTooltipSearchIndex;
 import com.cappleapple.bundlednotsiloed.client.ExpandedMenuHoverPolicy;
 import com.cappleapple.bundlednotsiloed.client.InventoryBrowserControls;
 import com.cappleapple.bundlednotsiloed.client.InventoryBrowserControls.CategoryOption;
+import com.cappleapple.bundlednotsiloed.client.InventoryButtonTooltipRenderer;
+import com.cappleapple.bundlednotsiloed.client.InventoryCapacityPulse;
 import com.cappleapple.bundlednotsiloed.client.InventoryCountFormatter;
 import com.cappleapple.bundlednotsiloed.client.InventorySearchBar;
+import com.cappleapple.bundlednotsiloed.client.InventorySideRail;
+import com.cappleapple.bundlednotsiloed.client.InventorySideRail.Rail;
 import com.cappleapple.bundlednotsiloed.client.InventoryScreenLayout;
 import com.cappleapple.bundlednotsiloed.client.InventoryWindowUpdatePolicy;
 import com.cappleapple.bundlednotsiloed.client.ItemSearchExpression;
@@ -30,7 +35,6 @@ import java.util.Objects;
 import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.network.chat.Component;
@@ -48,14 +52,18 @@ public final class BundledInventoryScreen extends InventoryScreen {
     private static final int MAX_QUERY = 96;
     private static final int CATEGORY_POPUP_ROWS = 4;
     private static final int CATEGORY_POPUP_HEIGHT = CATEGORY_POPUP_ROWS * InventoryScreenLayout.CELL_SIZE;
-    private static final int SETTINGS_POPUP_X = 56;
+    private static final int SETTINGS_POPUP_X = InventoryScreenLayout.GRID_X - 1;
     private static final int SETTINGS_POPUP_Y = InventoryScreenLayout.GRID_Y - 1;
     private static final int SETTINGS_POPUP_WIDTH = 112;
     private static final int SETTINGS_ROW_HEIGHT = 18;
     private static final int SETTINGS_POPUP_HEIGHT = SETTINGS_ROW_HEIGHT * 3 + 2;
     private final Player player;
-    private EditBox searchBox;
-    private String query = "";
+    private final BrowserSearchQuery search = new BrowserSearchQuery(MAX_QUERY);
+    private final InventoryCapacityPulse capacityPulse = new InventoryCapacityPulse();
+    private boolean searchFocused;
+    private boolean searchHoverRefocusArmed = true;
+    private double searchFocusMouseX;
+    private double searchFocusMouseY;
     private boolean categoryMenuOpen;
     private boolean settingsMenuOpen;
     private boolean suppressNextCharacter;
@@ -88,24 +96,8 @@ public final class BundledInventoryScreen extends InventoryScreen {
     protected void init() {
         restoreInventorySlotCoordinates();
         super.init();
-        // Keep the avatar/crafting profile at vanilla's exact screen position and extend only downward.
-        this.topPos = (this.height - InventoryScreenLayout.VANILLA_IMAGE_HEIGHT) / 2;
         shiftInventorySlots();
-
-        this.searchBox = new EditBox(this.font,
-                this.leftPos + InventoryScreenLayout.SEARCH_X + 3,
-                this.topPos + InventoryScreenLayout.SEARCH_Y + 2,
-                InventoryScreenLayout.SEARCH_WIDTH - 6,
-                9,
-                Component.translatable("gui.bundlednotsiloed.search"));
-        this.searchBox.setBordered(false);
-        this.searchBox.setTextShadow(false);
-        this.searchBox.setMaxLength(MAX_QUERY);
-        this.searchBox.setHint(Component.translatable("gui.bundlednotsiloed.search_hint_compact"));
-        this.searchBox.setValue(query);
-        this.searchBox.setResponder(this::updateSearch);
-        updateSearch(query);
-        this.addRenderableWidget(this.searchBox);
+        capacityPulse.reset();
 
         if (!browserStateSent && minecraft.getConnection() != null) {
             PacketDistributor.sendToServer(new BrowserStatePayload(true));
@@ -116,6 +108,9 @@ public final class BundledInventoryScreen extends InventoryScreen {
 
     @Override
     public void removed() {
+        search.clear();
+        searchFocused = false;
+        searchHoverRefocusArmed = true;
         restoreInventorySlotCoordinates();
         if (browserStateSent && minecraft.getConnection() != null) {
             PacketDistributor.sendToServer(new BrowserStatePayload(false));
@@ -129,29 +124,29 @@ public final class BundledInventoryScreen extends InventoryScreen {
     protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
         int x = this.leftPos;
         int y = this.topPos;
-
         graphics.blit(INVENTORY_LOCATION, x, y, 0, 0,
-                InventoryScreenLayout.VANILLA_IMAGE_WIDTH, InventoryScreenLayout.TOOLBAR_Y);
-        for (int row = 0; row < InventoryScreenLayout.TOOLBAR_EXTENSION; row++) {
-            graphics.blit(INVENTORY_LOCATION, x, y + InventoryScreenLayout.TOOLBAR_Y + row,
-                    0, 80, InventoryScreenLayout.VANILLA_IMAGE_WIDTH, 1);
-        }
-        graphics.blit(INVENTORY_LOCATION, x, y + InventoryScreenLayout.TOOLBAR_Y + InventoryScreenLayout.TOOLBAR_EXTENSION,
-                0, InventoryScreenLayout.TOOLBAR_Y,
-                InventoryScreenLayout.VANILLA_IMAGE_WIDTH,
-                InventoryScreenLayout.VANILLA_IMAGE_HEIGHT - InventoryScreenLayout.TOOLBAR_Y);
+                InventoryScreenLayout.VANILLA_IMAGE_WIDTH, InventoryScreenLayout.VANILLA_IMAGE_HEIGHT);
 
-        InventorySearchBar.render(graphics,
-                x + InventoryScreenLayout.SEARCH_X,
-                y + InventoryScreenLayout.SEARCH_Y,
-                player.getData(ModAttachments.PLAYER_DATA).inventory());
-        renderToolbarButton(graphics, InventoryScreenLayout.CATEGORY_X,
+        Rail rail = sideRail();
+        rail.renderBackground(graphics);
+        boolean searchHovered = rail.searchContains(mouseX, mouseY);
+        InventorySearchBar.renderButton(graphics, rail.searchX(), rail.searchY(),
+                InventorySearchBar.shouldHighlight(search.value(), searchFocused, searchHovered,
+                        System.currentTimeMillis()));
+        InventoryBrowserControls.renderButton(graphics, rail.categoryX(), rail.categoryY(),
                 Screen.hasShiftDown() ? new ItemStack(Items.STICKY_PISTON)
                         : CategoryIcons.displayStack(currentCategory()),
-                categoryMenuOpen, mouseX, mouseY);
-        renderToolbarButton(graphics, InventoryScreenLayout.SETTINGS_X,
+                categoryMenuOpen || rail.categoryContains(mouseX, mouseY));
+        InventoryBrowserControls.renderButton(graphics, rail.settingsX(), rail.settingsY(),
                 InventoryBrowserControls.configuredIcon(ClientConfig.SETTINGS_ICON.get()),
-                settingsMenuOpen, mouseX, mouseY);
+                settingsMenuOpen || rail.settingsContains(mouseX, mouseY));
+        capacityPulse.render(graphics,
+                x + InventoryScreenLayout.GRID_X,
+                y + InventoryScreenLayout.FULLNESS_Y,
+                InventoryScreenLayout.GRID_COLUMNS * InventoryScreenLayout.CELL_SIZE,
+                InventoryScreenLayout.FULLNESS_HEIGHT,
+                player.getData(ModAttachments.PLAYER_DATA).inventory(),
+                System.currentTimeMillis());
 
         renderEntityInInventoryFollowsMouse(graphics, x + 26, y + 8, x + 75, y + 78,
                 30, 0.0625F, mouseX, mouseY, this.minecraft.player);
@@ -167,6 +162,15 @@ public final class BundledInventoryScreen extends InventoryScreen {
         super.render(graphics, mouseX, mouseY, partialTick);
         if (blockedByRecipeBook()) return;
 
+        if (searchFocused) {
+            graphics.pose().pushPose();
+            graphics.pose().translate(0, 0, 425);
+            InventorySideRail.renderExpandedSearch(graphics, font, sideRail(), search.value(),
+                    search.allSelected(), ItemSearchExpression.parse(search.value()).valid(),
+                    (System.currentTimeMillis() / 500L) % 2 == 0);
+            graphics.pose().popPose();
+        }
+
         graphics.pose().pushPose();
         graphics.pose().translate(0, 0, 450);
         if (categoryMenuOpen) renderCategoryMenu(graphics, mouseX, mouseY);
@@ -176,29 +180,37 @@ public final class BundledInventoryScreen extends InventoryScreen {
         resolveToolbarHover(mouseX, mouseY);
         graphics.pose().pushPose();
         graphics.pose().translate(0, 0, 500);
-        if (hoveredEntry != null && !categoryMenuOpen && !settingsMenuOpen) {
-            graphics.renderTooltip(font, hoveredEntry.representative(), mouseX, mouseY);
-        } else if (hoveredCategory != null) {
+        if (hoveredCategory != null) {
             graphics.renderTooltip(font, hoveredCategory.name(), mouseX, mouseY);
         } else if (!hoveredTooltip.isEmpty()) {
-            graphics.renderComponentTooltip(font, hoveredTooltip, mouseX, mouseY);
+            InventoryButtonTooltipRenderer.render(
+                    graphics, font, hoveredTooltip, mouseX, mouseY, Screen.hasShiftDown());
         }
         graphics.pose().popPose();
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        boolean searchClicked = InventorySearchBar.contains(mouseX, mouseY,
-                this.leftPos + InventoryScreenLayout.SEARCH_X,
-                this.topPos + InventoryScreenLayout.SEARCH_Y);
+        Rail rail = sideRail();
+        boolean searchClicked = rail.searchContains(mouseX, mouseY);
         if (!searchClicked) clearSearchFocus();
         if (blockedByRecipeBook()) return super.mouseClicked(mouseX, mouseY, button);
         double localX = mouseX - this.leftPos;
         double localY = mouseY - this.topPos;
 
-        if (InventoryScreenLayout.inside(localX, localY,
-                InventoryScreenLayout.CATEGORY_X, InventoryScreenLayout.CONTROL_Y,
-                InventoryScreenLayout.CONTROL_SIZE, InventoryScreenLayout.CONTROL_SIZE)) {
+        if (searchClicked) {
+            if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
+                updateSearch(search.clear());
+                clearSearchFocus();
+                return true;
+            }
+            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+                focusSearch(mouseX, mouseY);
+                return true;
+            }
+        }
+
+        if (rail.categoryContains(mouseX, mouseY)) {
             if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && Screen.hasShiftDown()) {
                 PacketDistributor.sendToServer(new StowMainGridPayload());
                 categoryMenuOpen = false;
@@ -213,9 +225,7 @@ public final class BundledInventoryScreen extends InventoryScreen {
             categoryScrollRow = 0;
             return true;
         }
-        if (InventoryScreenLayout.inside(localX, localY,
-                InventoryScreenLayout.SETTINGS_X, InventoryScreenLayout.CONTROL_Y,
-                InventoryScreenLayout.CONTROL_SIZE, InventoryScreenLayout.CONTROL_SIZE)) {
+        if (rail.settingsContains(mouseX, mouseY)) {
             settingsMenuOpen = !settingsMenuOpen;
             categoryMenuOpen = false;
             return true;
@@ -240,11 +250,6 @@ public final class BundledInventoryScreen extends InventoryScreen {
             settingsMenuOpen = false;
         }
 
-        if (searchClicked && button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
-            searchBox.setValue("");
-            focusSearch();
-            return true;
-        }
         int visibleEntryCount = visibleEntryCount();
         if (InventoryScreenLayout.maximumScrollRow(visibleEntryCount) > 0
                 && InventoryScreenLayout.inside(localX, localY,
@@ -266,9 +271,7 @@ public final class BundledInventoryScreen extends InventoryScreen {
         int direction = -(int)Math.signum(scrollY);
         if (direction == 0) return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
 
-        if (InventoryScreenLayout.inside(localX, localY,
-                InventoryScreenLayout.CATEGORY_X, InventoryScreenLayout.CONTROL_Y,
-                InventoryScreenLayout.CONTROL_SIZE, InventoryScreenLayout.CONTROL_SIZE)) {
+        if (sideRail().categoryContains(mouseX, mouseY)) {
             changeCategory(direction);
             categoryMenuOpen = false;
             return true;
@@ -314,20 +317,32 @@ public final class BundledInventoryScreen extends InventoryScreen {
             return true;
         }
         InputConstants.Key pressed = InputConstants.getKey(keyCode, scanCode);
-        if (!searchBox.isFocused() && ClientKeyMappings.SEARCH_BROWSER.isActiveAndMatches(pressed)) {
-            searchBox.setValue("");
-            focusSearch();
+        if (!searchFocused && ClientKeyMappings.SEARCH_BROWSER.isActiveAndMatches(pressed)) {
+            focusSearch(currentMouseX(), currentMouseY());
             suppressNextCharacter = true;
             return true;
         }
-        if (searchBox.isFocused()) {
-            if (minecraft.options.keyInventory.matches(keyCode, scanCode)) return true;
-            if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
-                clearSearchFocus();
-                return true;
-            }
-        }
+        if (searchFocused) return captureSearchKeyPressed(keyCode, scanCode);
         return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    public boolean captureSearchKeyPressed(int keyCode, int scanCode) {
+        if (!searchFocused) return false;
+        if (minecraft.options.keyInventory.matches(keyCode, scanCode)) return true;
+        if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+            clearSearchFocus();
+        } else if (keyCode == GLFW.GLFW_KEY_A && Screen.hasControlDown()) {
+            search.selectAll();
+        } else if (keyCode == GLFW.GLFW_KEY_BACKSPACE) {
+            updateSearch(search.backspace());
+        } else if (keyCode == GLFW.GLFW_KEY_DELETE) {
+            updateSearch(search.deleteSelection());
+        }
+        return true;
+    }
+
+    public boolean isSearchTyping() {
+        return searchFocused;
     }
 
     @Override
@@ -336,7 +351,54 @@ public final class BundledInventoryScreen extends InventoryScreen {
             suppressNextCharacter = false;
             return true;
         }
+        if (searchFocused && search.append(codePoint)) {
+            updateSearch(true);
+            return true;
+        }
         return super.charTyped(codePoint, modifiers);
+    }
+
+    @Override
+    public void mouseMoved(double mouseX, double mouseY) {
+        super.mouseMoved(mouseX, mouseY);
+        boolean searchHovered = sideRail().searchContains(mouseX, mouseY);
+        if (!searchHovered) searchHoverRefocusArmed = true;
+        if (InventorySearchBar.shouldRefocus(
+                search.value(), searchFocused, searchHovered, searchHoverRefocusArmed)) {
+            focusSearch(mouseX, mouseY);
+            return;
+        }
+        if (InventorySearchBar.shouldReleaseFocus(searchFocused,
+                mouseX != searchFocusMouseX || mouseY != searchFocusMouseY,
+                searchHovered, isSearchBlockingTarget(mouseX, mouseY))) {
+            clearSearchFocus();
+        }
+    }
+
+    private boolean isSearchBlockingTarget(double mouseX, double mouseY) {
+        Rail rail = sideRail();
+        if (rail.categoryContains(mouseX, mouseY) || rail.settingsContains(mouseX, mouseY)) {
+            return true;
+        }
+        double localX = mouseX - this.leftPos;
+        double localY = mouseY - this.topPos;
+        if ((categoryMenuOpen && insideCategoryPopup(localX, localY))
+                || (settingsMenuOpen && insideSettingsPopup(localX, localY))) {
+            return true;
+        }
+        if (InventoryScreenLayout.inside(localX, localY,
+                InventoryScreenLayout.SCROLLBAR_X - 1, InventoryScreenLayout.SCROLLBAR_Y,
+                InventoryScreenLayout.SCROLLBAR_WIDTH + 2, InventoryScreenLayout.SCROLLBAR_HEIGHT)
+                || this.getChildAt(mouseX, mouseY).isPresent()) {
+            return true;
+        }
+        for (Slot slot : this.menu.slots) {
+            if (InventoryScreenLayout.inside(mouseX, mouseY,
+                    this.leftPos + slot.x - 1, this.topPos + slot.y - 1, 18, 18)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void renderEntries(GuiGraphics graphics, int mouseX, int mouseY) {
@@ -392,21 +454,6 @@ public final class BundledInventoryScreen extends InventoryScreen {
                 thumbY + thumbHeight, 0xFFFFFFFF);
         graphics.fill(x + 1, thumbY + 1, x + InventoryScreenLayout.SCROLLBAR_WIDTH,
                 thumbY + thumbHeight, 0xFF8B8B8B);
-    }
-
-    private void renderToolbarButton(
-            GuiGraphics graphics,
-            int localX,
-            ItemStack icon,
-            boolean active,
-            int mouseX,
-            int mouseY
-    ) {
-        int x = this.leftPos + localX;
-        int y = this.topPos + InventoryScreenLayout.CONTROL_Y;
-        boolean hovered = InventoryScreenLayout.inside(mouseX, mouseY, x, y,
-                InventoryScreenLayout.CONTROL_SIZE, InventoryScreenLayout.CONTROL_SIZE);
-        InventoryBrowserControls.renderButton(graphics, x, y, icon, active || hovered);
     }
 
     private void renderCategoryMenu(GuiGraphics graphics, int mouseX, int mouseY) {
@@ -467,11 +514,8 @@ public final class BundledInventoryScreen extends InventoryScreen {
     }
 
     private void resolveToolbarHover(int mouseX, int mouseY) {
-        double localX = mouseX - this.leftPos;
-        double localY = mouseY - this.topPos;
-        if (InventoryScreenLayout.inside(localX, localY,
-                InventoryScreenLayout.CATEGORY_X, InventoryScreenLayout.CONTROL_Y,
-                InventoryScreenLayout.CONTROL_SIZE, InventoryScreenLayout.CONTROL_SIZE)) {
+        Rail rail = sideRail();
+        if (rail.categoryContains(mouseX, mouseY)) {
             CategoryDefinition category = currentCategory();
             Component categoryName = category == null
                     ? Component.translatable("gui.bundlednotsiloed.all")
@@ -479,13 +523,9 @@ public final class BundledInventoryScreen extends InventoryScreen {
             hoveredTooltip = Screen.hasShiftDown()
                     ? List.of(categoryName, Component.translatable("gui.bundlednotsiloed.stow_main_grid_hint"))
                     : List.of(categoryName);
-        } else if (InventoryScreenLayout.inside(localX, localY,
-                InventoryScreenLayout.SETTINGS_X, InventoryScreenLayout.CONTROL_Y,
-                InventoryScreenLayout.CONTROL_SIZE, InventoryScreenLayout.CONTROL_SIZE)) {
+        } else if (rail.settingsContains(mouseX, mouseY)) {
             hoveredTooltip = List.of(Component.translatable("gui.bundlednotsiloed.inventory_menu"));
-        } else if (InventoryScreenLayout.inside(localX, localY,
-                InventoryScreenLayout.SEARCH_X, InventoryScreenLayout.SEARCH_Y,
-                InventoryScreenLayout.SEARCH_WIDTH, InventoryScreenLayout.SEARCH_HEIGHT)) {
+        } else if (rail.searchContains(mouseX, mouseY)) {
             hoveredTooltip = InventorySearchBar.tooltip(
                     player.getData(ModAttachments.PLAYER_DATA).inventory(), Screen.hasShiftDown());
         }
@@ -495,7 +535,7 @@ public final class BundledInventoryScreen extends InventoryScreen {
         var data = player.getData(ModAttachments.PLAYER_DATA);
         ResourceLocation categoryId = data.selectedCategoryPreference();
         SortMode sortMode = data.inventorySortPreference();
-        String value = query;
+        String value = search.value();
         if (player.getUUID().equals(cachedPlayer)
                 && data.inventory().revision() == cachedRevision
                 && data.categories().revision() == cachedCategoryRevision
@@ -620,25 +660,41 @@ public final class BundledInventoryScreen extends InventoryScreen {
                 settingsMenuOpen, insideSettingsPopup(localX, localY));
     }
 
-    private void updateSearch(String value) {
-        query = value;
-        ItemSearchExpression search = ItemSearchExpression.parse(value);
-        if (searchBox != null) searchBox.setTextColor(search.valid() ? 0x404040 : 0xFF5555);
+    private void updateSearch(boolean changed) {
+        if (!changed) return;
         entryScrollRow = 0;
         invalidateEntries();
     }
 
-    private void focusSearch() {
+    private void focusSearch(double mouseX, double mouseY) {
         categoryMenuOpen = false;
         settingsMenuOpen = false;
-        this.setFocused(searchBox);
-        searchBox.setFocused(true);
+        searchFocused = true;
+        searchHoverRefocusArmed = false;
+        search.clearSelection();
+        searchFocusMouseX = mouseX;
+        searchFocusMouseY = mouseY;
     }
 
     private void clearSearchFocus() {
-        if (searchBox == null || !searchBox.isFocused()) return;
-        searchBox.setFocused(false);
-        this.setFocused(null);
+        if (!searchFocused) return;
+        searchFocused = false;
+        searchHoverRefocusArmed = false;
+        search.clearSelection();
+    }
+
+    private Rail sideRail() {
+        return InventorySideRail.at(this.leftPos, this.topPos + InventoryScreenLayout.GRID_Y);
+    }
+
+    private double currentMouseX() {
+        return minecraft.mouseHandler.xpos() * minecraft.getWindow().getGuiScaledWidth()
+                / minecraft.getWindow().getScreenWidth();
+    }
+
+    private double currentMouseY() {
+        return minecraft.mouseHandler.ypos() * minecraft.getWindow().getGuiScaledHeight()
+                / minecraft.getWindow().getScreenHeight();
     }
 
     private void invalidateEntries() {
@@ -700,7 +756,7 @@ public final class BundledInventoryScreen extends InventoryScreen {
     }
 
     private boolean usesIdentityView() {
-        return !query.trim().isEmpty();
+        return !search.value().trim().isEmpty();
     }
 
     private int visibleEntryCount() {

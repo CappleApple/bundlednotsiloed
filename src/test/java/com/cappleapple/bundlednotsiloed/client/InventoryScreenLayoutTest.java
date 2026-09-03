@@ -6,15 +6,14 @@ import org.junit.jupiter.api.Test;
 
 class InventoryScreenLayoutTest {
     @Test
-    void compactToolbarMovesTheInventoryRowsByOnlySixteenPixels() {
-        assertEquals(182, InventoryScreenLayout.IMAGE_HEIGHT);
-        assertEquals(100, InventoryScreenLayout.GRID_Y);
-        assertEquals(158, InventoryScreenLayout.HOTBAR_Y);
-        assertEquals(16, InventoryScreenLayout.GRID_Y - 84);
-        assertEquals(16, InventoryScreenLayout.HOTBAR_Y - 142);
-        assertEquals(InventoryScreenLayout.SEARCH_HEIGHT, InventoryScreenLayout.CONTROL_SIZE);
-        assertEquals(3, InventoryScreenLayout.CATEGORY_X
-                - InventoryScreenLayout.SEARCH_X - InventoryScreenLayout.SEARCH_WIDTH);
+    void retainsVanillaInventoryBoundsAndSlotMargins() {
+        assertEquals(166, InventoryScreenLayout.IMAGE_HEIGHT);
+        assertEquals(84, InventoryScreenLayout.GRID_Y);
+        assertEquals(142, InventoryScreenLayout.HOTBAR_Y);
+        assertEquals(138, InventoryScreenLayout.FULLNESS_Y);
+        assertEquals(2, InventoryScreenLayout.FULLNESS_HEIGHT);
+        assertEquals(171, InventoryScreenLayout.SCROLLBAR_X);
+        assertEquals(2, InventoryScreenLayout.SCROLLBAR_WIDTH);
     }
 
     @Test
@@ -23,9 +22,9 @@ class InventoryScreenLayoutTest {
         assertEquals(0, InventoryScreenLayout.maximumScrollRow(27));
         assertEquals(1, InventoryScreenLayout.maximumScrollRow(28));
         assertEquals(2, InventoryScreenLayout.maximumScrollRow(45));
-        assertEquals(0, InventoryScreenLayout.entryIndexAt(8, 100, 0));
-        assertEquals(26, InventoryScreenLayout.entryIndexAt(169, 153, 0));
-        assertEquals(27, InventoryScreenLayout.entryIndexAt(8, 100, 3));
+        assertEquals(0, InventoryScreenLayout.entryIndexAt(8, 84, 0));
+        assertEquals(26, InventoryScreenLayout.entryIndexAt(169, 137, 0));
+        assertEquals(27, InventoryScreenLayout.entryIndexAt(8, 84, 3));
     }
 
     @Test

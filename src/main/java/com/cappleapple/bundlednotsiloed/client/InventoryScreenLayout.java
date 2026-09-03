@@ -4,28 +4,19 @@ package com.cappleapple.bundlednotsiloed.client;
 public final class InventoryScreenLayout {
     public static final int VANILLA_IMAGE_WIDTH = 176;
     public static final int VANILLA_IMAGE_HEIGHT = 166;
-    public static final int TOOLBAR_EXTENSION = 16;
-    public static final int IMAGE_HEIGHT = VANILLA_IMAGE_HEIGHT + TOOLBAR_EXTENSION;
-    public static final int TOOLBAR_Y = 83;
-    public static final int SEARCH_X = 8;
-    public static final int SEARCH_Y = 84;
-    public static final int SEARCH_WIDTH = InventorySearchBar.WIDTH;
-    public static final int SEARCH_HEIGHT = InventorySearchBar.HEIGHT;
-    public static final int CATEGORY_X = SEARCH_X + SEARCH_WIDTH + InventoryBrowserControls.GAP;
-    public static final int SETTINGS_X = CATEGORY_X
-            + InventoryBrowserControls.SIZE + InventoryBrowserControls.GAP;
-    public static final int CONTROL_Y = 84;
-    public static final int CONTROL_SIZE = InventoryBrowserControls.SIZE;
+    public static final int IMAGE_HEIGHT = VANILLA_IMAGE_HEIGHT;
     public static final int GRID_X = 8;
-    public static final int GRID_Y = 100;
+    public static final int GRID_Y = 84;
     public static final int GRID_COLUMNS = 9;
     public static final int GRID_ROWS = 3;
     public static final int CELL_SIZE = 18;
-    public static final int HOTBAR_Y = 158;
+    public static final int HOTBAR_Y = 142;
+    public static final int FULLNESS_Y = 138;
+    public static final int FULLNESS_HEIGHT = 2;
     public static final int VISIBLE_ENTRIES = GRID_COLUMNS * GRID_ROWS;
     public static final int SCROLLBAR_X = GRID_X + GRID_COLUMNS * CELL_SIZE + 1;
     public static final int SCROLLBAR_Y = GRID_Y;
-    public static final int SCROLLBAR_WIDTH = 3;
+    public static final int SCROLLBAR_WIDTH = 2;
     public static final int SCROLLBAR_HEIGHT = GRID_ROWS * CELL_SIZE;
 
     private InventoryScreenLayout() {}
