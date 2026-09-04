@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.1 - 2026-09-03
+
+### Fixed
+
+- Shift-clicking the final stowed stack with no valid destination no longer repeats the same quick-move indefinitely and freezes the game.
+- Shift-clicking a stowed stack now falls back from a full hotbar to matching or empty slots in the visible main inventory, and remains in place when neither region can accept it.
+
 ## 1.4 - 2026-09-03
 
 ### Added

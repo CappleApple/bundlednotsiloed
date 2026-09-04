@@ -65,14 +65,14 @@ Linux/macOS:
 ./gradlew runServer
 ```
 
-The built mod is written to `build/libs/bundlednotsiloed-1.4.jar`. The project uses official Mojang mappings with Parchment parameter names and ModDevGradle's Minecraft-aware JUnit support.
+The built mod is written to `build/libs/bundlednotsiloed-1.4.1.jar`. The project uses official Mojang mappings with Parchment parameter names and ModDevGradle's Minecraft-aware JUnit support.
 
 ## Player usage
 
 Open the normal inventory to see Minecraft's familiar player model, armor, crafting, recipe-book, hotbar, dimensions, and slot margins. A creative-tab-style rail attached to the left of the main grid contains vertically stacked search, category, and settings buttons. The normal view always exposes the complete 27-cell vanilla main grid, including empty cells, and preserves manual placement. It gains additional nine-cell scroll rows only when occupied logical storage extends past that base. Search combines exact item-and-component identities into one displayed quantity, while category and sort clicks perform one arrangement and keep the real native slots active. Tooltips for items hovered in the player inventory or hotbar append the exact quantity of that item-and-components identity owned across the unified inventory; other tooltip sources do not. The hotbar remains a separate nine-position access view.
 
 - Use normal left/right clicks, drag splitting, double-click collection, number keys, and compatible mod interactions on the real player slots.
-- In the open player inventory, Shift-clicking a hotbar stack first merges into or fills the 27-slot main inventory, then uses the first available stowed slot. Shift-clicking a main-inventory or stowed stack instead tries the hotbar first, then appends any remainder after the currently necessary logical storage slots.
+- In the open player inventory, Shift-clicking a hotbar stack first merges into or fills the 27-slot main inventory, then uses the first available stowed slot. A main-inventory stack tries the hotbar first, then appends any remainder after the currently necessary logical storage slots. A stowed stack tries the hotbar, then the visible main inventory, and stays in place when neither region can accept it.
 - In an opened container, Shift-left-click a player stack to let that menu transfer one legal stack. Shift-right-click to repeat the same native transfer for as much of that exact item-and-component identity as the container can accept.
 - Press the normal drop key while hovering an entry to drop one; hold Control to drop a stack.
 - Scroll over the 27-cell grid to move through additional logical rows. The narrow scrollbar appears only when the inventory or active search has more than 27 visible positions.

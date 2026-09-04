@@ -1,6 +1,7 @@
 package com.cappleapple.bundlednotsiloed.inventory;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.cappleapple.stacksnotslots.api.inventory.DynamicCapacityInventory;
@@ -106,6 +107,45 @@ class PlayerInventoryQuickMoveTest {
         assertEquals(64, inventory.syntheticStack(0).getCount());
         assertEquals(63, inventory.syntheticStack(36).getCount());
         assertTrue(inventory.syntheticStack(36).is(Items.DIRT));
+        assertTrue(inventory.validate());
+    }
+
+    @Test
+    void stowedSourceFallsBackToTheMainInventoryWhenTheHotbarIsFull() {
+        DynamicCapacityInventory inventory = inventory();
+        for (int slot = 0; slot < 9; slot++) {
+            inventory.replaceSyntheticSlot(slot, new ItemStack(Items.STONE, 64));
+        }
+        inventory.replaceSyntheticSlot(9, new ItemStack(Items.DIRT, 63));
+        inventory.replaceSyntheticSlot(11, new ItemStack(Items.APPLE, 64));
+        inventory.replaceSyntheticSlot(36, new ItemStack(Items.DIRT, 4));
+
+        assertTrue(PlayerInventoryQuickMove.move(inventory, 36));
+
+        assertEquals(64, inventory.syntheticStack(9).getCount());
+        assertEquals(3, inventory.syntheticStack(10).getCount());
+        assertTrue(inventory.syntheticStack(10).is(Items.DIRT));
+        assertTrue(inventory.syntheticStack(36).isEmpty());
+        assertTrue(inventory.validate());
+    }
+
+    @Test
+    void stowedSourceDoesNothingWhenTheHotbarAndMainInventoryAreFull() {
+        DynamicCapacityInventory inventory = inventory();
+        for (int slot = 0; slot < 9; slot++) {
+            inventory.replaceSyntheticSlot(slot, new ItemStack(Items.STONE, 64));
+        }
+        for (int slot = 9; slot < 36; slot++) {
+            inventory.replaceSyntheticSlot(slot, new ItemStack(Items.COBBLESTONE, 64));
+        }
+        inventory.replaceSyntheticSlot(61, new ItemStack(Items.COBBLESTONE, 64));
+        inventory.replaceSyntheticSlot(62, new ItemStack(Items.DIRT, 4));
+
+        assertFalse(PlayerInventoryQuickMove.move(inventory, 62));
+
+        assertEquals(4, inventory.syntheticStack(62).getCount());
+        assertTrue(inventory.syntheticStack(62).is(Items.DIRT));
+        assertEquals(63, inventory.syntheticSlotCount());
         assertTrue(inventory.validate());
     }
 

@@ -15,8 +15,9 @@ public final class PlayerInventoryQuickMove {
     private PlayerInventoryQuickMove() {}
 
     /**
-     * Moves hotbar sources through the main grid and then stowed storage. Other sources move
-     * through the hotbar first, with any remainder appended after the last necessary logical slot.
+     * Moves hotbar sources through the main grid and then stowed storage. Main-grid sources move
+     * through the hotbar before appending to stowed storage, while stowed sources fall back from
+     * the hotbar to the main grid and otherwise remain in place.
      */
     public static boolean move(DynamicCapacityInventory inventory, int sourceSlot) {
         Objects.requireNonNull(inventory, "inventory");
@@ -37,9 +38,18 @@ public final class PlayerInventoryQuickMove {
         } else {
             remaining = mergeRange(inventory, remaining, HOTBAR_START, HOTBAR_END, sourceSlot);
             remaining = fillRange(inventory, remaining, HOTBAR_START, HOTBAR_END, sourceSlot);
-            if (!remaining.isEmpty()) {
+            if (sourceSlot >= STOWED_START) {
+                remaining = mergeRange(inventory, remaining, MAIN_GRID_START, STOWED_START, sourceSlot);
+                remaining = fillRange(inventory, remaining, MAIN_GRID_START, STOWED_START, sourceSlot);
+            } else if (!remaining.isEmpty()) {
                 int tailSlot = Math.max(STOWED_START, inventory.syntheticSlotCount());
-                remaining = inventory.insertIntoSyntheticSlot(remaining, tailSlot, false).remainder();
+                // Extracting the last occupied stack trims the backend extent, which can make the
+                // append slot equal the source. Reinserting there and reporting success causes
+                // Minecraft's QUICK_MOVE loop to retry forever because the source never changes.
+                if (tailSlot != sourceSlot) {
+                    remaining = inventory.insertIntoSyntheticSlot(
+                            remaining, tailSlot, false).remainder();
+                }
             }
         }
 
