@@ -16,7 +16,7 @@ class VisibleStackRefillTest {
     @BeforeAll static void bootstrapMinecraft() { SharedConstants.tryDetectVersion(); Bootstrap.bootStrap(); }
 
     @Test
-    void topsUpVisibleStacksOnlyFromBackend() {
+    void topsUpOnlyHotbarStacksFromStowedStorage() {
         DynamicCapacityInventory inventory = new DynamicCapacityInventory(() -> 10_000);
         inventory.replaceSyntheticSlot(0, new ItemStack(Items.DIRT, 60));
         inventory.replaceSyntheticSlot(9, new ItemStack(Items.DIRT, 5));
@@ -25,8 +25,8 @@ class VisibleStackRefillTest {
         assertTrue(VisibleStackRefill.refill(inventory));
 
         assertEquals(64, inventory.syntheticStack(0).getCount());
-        assertEquals(11, inventory.syntheticStack(9).getCount());
-        assertTrue(inventory.syntheticStack(36).isEmpty());
+        assertEquals(5, inventory.syntheticStack(9).getCount());
+        assertEquals(6, inventory.syntheticStack(36).getCount());
         assertFalse(VisibleStackRefill.refill(inventory));
     }
 }

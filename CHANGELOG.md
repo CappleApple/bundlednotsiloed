@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.2 - 2026-09-03
+
+### Changed
+
+- Stowed-stack auto-refill now tops up only hotbar stacks and leaves the 27-slot main inventory untouched.
+
 ## 1.4.1 - 2026-09-03
 
 ### Fixed

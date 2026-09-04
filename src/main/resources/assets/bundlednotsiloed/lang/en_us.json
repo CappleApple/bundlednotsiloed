@@ -74,7 +74,7 @@
   "tooltip.bundlednotsiloed.item_count_mode": "Item count choices: Exact, Compact (default), Stacks, Stacks plus remainder, or Percentage of total capacity.",
   "tooltip.bundlednotsiloed.overall_count_mode": "Capacity count choices: Exact, Compact, Stacks (default), or Percentage.",
   "tooltip.bundlednotsiloed.bulk_overlay": "Shows a compact item grid after an in-world dump or extraction. The counts are rounded up to stacks.",
-  "tooltip.bundlednotsiloed.auto_refill": "Automatically tops up existing hotbar and main-inventory stacks from matching stowed items. Enabled by default.",
+  "tooltip.bundlednotsiloed.auto_refill": "Automatically tops up existing hotbar stacks from matching stowed items. Enabled by default.",
   "tooltip.bundlednotsiloed.new_item_destination": "Choose where brand-new item types go first: Hotbar First, Inventory First, or Stowed First. Existing matching visible or stowed stacks still take priority.",
   "tooltip.bundlednotsiloed.overlay_seconds": "How long the in-world bulk-transfer grid remains visible. Range 0.25-30 seconds; default 2.5.",
   "tooltip.bundlednotsiloed.configurable_icon": "Item ID rendered on this square control. Use namespace:item, such as minecraft:name_tag.",
