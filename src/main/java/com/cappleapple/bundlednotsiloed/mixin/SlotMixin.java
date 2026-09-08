@@ -23,6 +23,13 @@ public abstract class SlotMixin {
     @Shadow @Final public Container container;
     @Shadow @Final private int slot;
 
+    @Inject(method = "mayPickup", at = @At("HEAD"), cancellable = true)
+    private void bns$lockOpenBackpack(net.minecraft.world.entity.player.Player player, CallbackInfoReturnable<Boolean> callback) {
+        if (container == player.getInventory() && slot >= 0 && slot < Inventory.INVENTORY_SIZE
+                && player.getData(ModAttachments.PLAYER_DATA).inventoryWindow().logicalIndex(slot)
+                    == com.cappleapple.bundlednotsiloed.compat.OpenBackpackGuard.logicalSlot(player)) callback.setReturnValue(false);
+    }
+
     @Inject(method = "getMaxStackSize(Lnet/minecraft/world/item/ItemStack;)I", at = @At("HEAD"), cancellable = true)
     private void sns$capacityLimitedStackSize(ItemStack incoming, CallbackInfoReturnable<Integer> callback) {
         if (!(container instanceof Inventory playerInventory)) return;

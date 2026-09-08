@@ -6,7 +6,6 @@ import com.cappleapple.bundlednotsiloed.category.SortMode;
 import com.cappleapple.bundlednotsiloed.client.screen.CategoryIcons;
 import com.cappleapple.bundlednotsiloed.data.InventorySlotWindow;
 import com.cappleapple.bundlednotsiloed.data.PlayerInventoryData;
-import com.cappleapple.bundlednotsiloed.network.InventoryWindowPayload;
 import com.cappleapple.stacksnotslots.api.LogicalInventoryEntry;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -20,7 +19,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Shared compact controls and category options for integrated inventory toolbars. */
 public final class InventoryBrowserControls {
@@ -122,14 +120,16 @@ public final class InventoryBrowserControls {
             int scrollRow
     ) {
         List<ItemStack> prototypes = pagePrototypes(entries, scrollRow);
-        data.showInventoryWindow(prototypes);
-        PacketDistributor.sendToServer(InventoryWindowPayload.identities(prototypes));
+        InventorySlotWindow requested = new InventorySlotWindow();
+        requested.show(prototypes, data.inventory());
+        ClientInventoryWindows.request(requested.logicalSlots(), true);
     }
 
     public static void applyRange(PlayerInventoryData data, int scrollRow) {
         int firstLogicalSlot = rangeStart(scrollRow);
-        data.showInventoryRange(firstLogicalSlot);
-        PacketDistributor.sendToServer(InventoryWindowPayload.range(firstLogicalSlot));
+        InventorySlotWindow requested = new InventorySlotWindow();
+        requested.showRange(firstLogicalSlot);
+        ClientInventoryWindows.request(requested.logicalSlots(), false);
     }
 
     static int rangeStart(int scrollRow) {

@@ -17,6 +17,8 @@ public final class SophisticatedBackpacksCompatibility {
 
     private SophisticatedBackpacksCompatibility() {}
 
+    public static boolean registered() { return registered; }
+
     public static void commonSetup(FMLCommonSetupEvent event) {
         if (ModList.get().isLoaded(MOD_ID)) event.enqueueWork(SophisticatedBackpacksCompatibility::register);
     }

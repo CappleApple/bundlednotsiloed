@@ -11,7 +11,6 @@ import com.cappleapple.bundlednotsiloed.client.screen.InventoryBrowserSettingsSc
 import com.cappleapple.bundlednotsiloed.config.ClientConfig;
 import com.cappleapple.bundlednotsiloed.data.InventorySlotWindow;
 import com.cappleapple.bundlednotsiloed.data.ModAttachments;
-import com.cappleapple.bundlednotsiloed.network.BrowserStatePayload;
 import com.cappleapple.bundlednotsiloed.network.BrowserTransferPayload;
 import com.cappleapple.bundlednotsiloed.network.InventoryActionPayload;
 import com.cappleapple.bundlednotsiloed.network.InventoryViewPreferencesPayload;
@@ -234,6 +233,7 @@ public final class ContainerInventoryOverlay {
                 && screen.getMenu().getCarried().isEmpty()) {
             ItemStack source = activeGrid.cells().get(cell).slot().getItem();
             if (source.isEmpty()) return false;
+            if (ClientInventoryWindows.pending()) return true;
             consumedReleaseButton = button;
             PacketDistributor.sendToServer(new BrowserTransferPayload(
                     source, BrowserTransferPayload.Mode.MAXIMUM));
@@ -349,7 +349,7 @@ public final class ContainerInventoryOverlay {
         if (grid == null) return;
         activeScreen = screen;
         activeGrid = grid;
-        PacketDistributor.sendToServer(new BrowserStatePayload(true));
+        com.cappleapple.bundlednotsiloed.client.ClientInventoryWindows.open();
         scrollRow = 0;
         categoryScrollRow = 0;
         categoryMenuOpen = false;
@@ -366,7 +366,7 @@ public final class ContainerInventoryOverlay {
             Minecraft.getInstance().player.getData(ModAttachments.PLAYER_DATA).resetInventoryWindow();
         }
         if (Minecraft.getInstance().getConnection() != null) {
-            PacketDistributor.sendToServer(new BrowserStatePayload(false));
+            com.cappleapple.bundlednotsiloed.client.ClientInventoryWindows.close();
         }
         activeScreen = null;
         activeGrid = null;

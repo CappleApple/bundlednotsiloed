@@ -7,82 +7,33 @@ import java.util.List;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.world.item.ItemStack;
 
-/** Bounded client intent describing the logical range or identities shown by 27 real slots. */
-public record InventoryWindowPayload(Mode mode, int firstLogicalSlot, List<ItemStack> prototypes)
-        implements CustomPacketPayload {
-    public static final Type<InventoryWindowPayload> TYPE =
-            new Type<>(BundledNotSiloed.id("inventory_window"));
-    public static final StreamCodec<RegistryFriendlyByteBuf, InventoryWindowPayload> STREAM_CODEC =
-            new StreamCodec<>() {
-                @Override
-                public InventoryWindowPayload decode(RegistryFriendlyByteBuf buffer) {
-                    int encodedMode = buffer.readUnsignedByte();
-                    if (encodedMode >= Mode.values().length) {
-                        throw new IllegalArgumentException("Invalid inventory window mode");
-                    }
-                    Mode mode = Mode.values()[encodedMode];
-                    if (mode == Mode.RANGE) {
-                        return InventoryWindowPayload.range(buffer.readVarInt());
-                    }
-                    int count = buffer.readVarInt();
-                    if (count < 0 || count > InventorySlotWindow.VISIBLE_SLOTS) {
-                        throw new IllegalArgumentException("Invalid inventory window size");
-                    }
-                    ArrayList<ItemStack> prototypes = new ArrayList<>(count);
-                    for (int index = 0; index < count; index++) {
-                        prototypes.add(ItemStack.OPTIONAL_STREAM_CODEC.decode(buffer));
-                    }
-                    return InventoryWindowPayload.identities(prototypes);
-                }
-
-                @Override
-                public void encode(RegistryFriendlyByteBuf buffer, InventoryWindowPayload payload) {
-                    buffer.writeByte(payload.mode.ordinal());
-                    if (payload.mode == Mode.RANGE) {
-                        buffer.writeVarInt(payload.firstLogicalSlot);
-                        return;
-                    }
-                    buffer.writeVarInt(payload.prototypes.size());
-                    payload.prototypes.forEach(stack ->
-                            ItemStack.OPTIONAL_STREAM_CODEC.encode(buffer, stack));
-                }
-            };
-
-    public InventoryWindowPayload {
-        if (mode == null) throw new IllegalArgumentException("Inventory window mode is required");
-        if (mode == Mode.RANGE) {
-            if (firstLogicalSlot < InventorySlotWindow.MAIN_START
-                    || firstLogicalSlot > Integer.MAX_VALUE - InventorySlotWindow.VISIBLE_SLOTS
-                    || (firstLogicalSlot - InventorySlotWindow.MAIN_START) % 9 != 0) {
-                throw new IllegalArgumentException("Invalid inventory range start");
-            }
-            prototypes = List.of();
-        } else {
-            firstLogicalSlot = -1;
-            if (prototypes == null || prototypes.size() > InventorySlotWindow.VISIBLE_SLOTS) {
-                throw new IllegalArgumentException("Inventory window exceeds visible slot count");
-            }
-            prototypes = prototypes.stream()
-                    .map(stack -> stack == null || stack.isEmpty()
-                            ? ItemStack.EMPTY : stack.copyWithCount(1))
-                    .toList();
+/** Fixed-size references; never upload item components merely to scroll or search. */
+public record InventoryWindowPayload(long session, long request, int containerId, boolean identities,
+                                     List<Integer> slots) implements CustomPacketPayload {
+    public static final Type<InventoryWindowPayload> TYPE = new Type<>(BundledNotSiloed.id("inventory_window"));
+    public static final StreamCodec<RegistryFriendlyByteBuf, InventoryWindowPayload> STREAM_CODEC = new StreamCodec<>() {
+        public InventoryWindowPayload decode(RegistryFriendlyByteBuf buffer) {
+            long session = buffer.readVarLong();
+            long request = buffer.readVarLong();
+            int menu = buffer.readVarInt();
+            boolean identities = buffer.readBoolean();
+            List<Integer> slots = new ArrayList<>(InventorySlotWindow.VISIBLE_SLOTS);
+            for (int i = 0; i < InventorySlotWindow.VISIBLE_SLOTS; i++) slots.add(buffer.readVarInt());
+            return new InventoryWindowPayload(session, request, menu, identities, slots);
         }
+        public void encode(RegistryFriendlyByteBuf buffer, InventoryWindowPayload value) {
+            buffer.writeVarLong(value.session);
+            buffer.writeVarLong(value.request);
+            buffer.writeVarInt(value.containerId);
+            buffer.writeBoolean(value.identities);
+            value.slots.forEach(buffer::writeVarInt);
+        }
+    };
+    public InventoryWindowPayload {
+        if (session < 0 || request < 0) throw new IllegalArgumentException("Invalid window sequence");
+        new InventorySlotWindow().showSlots(slots, identities);
+        slots = List.copyOf(slots);
     }
-
-    public static InventoryWindowPayload range(int firstLogicalSlot) {
-        return new InventoryWindowPayload(Mode.RANGE, firstLogicalSlot, List.of());
-    }
-
-    public static InventoryWindowPayload identities(List<ItemStack> prototypes) {
-        return new InventoryWindowPayload(Mode.IDENTITIES, -1, prototypes);
-    }
-
-    @Override
-    public Type<? extends CustomPacketPayload> type() {
-        return TYPE;
-    }
-
-    public enum Mode { RANGE, IDENTITIES }
+    @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
 }

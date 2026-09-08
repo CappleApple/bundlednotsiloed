@@ -162,48 +162,33 @@ class InventoryPayloadCodecTest {
     }
 
     @Test
-    void boundedInventoryWindowRoundTripsEmptyAndOccupiedCells() {
+    void inventoryWindowRoundTripsOnlyBoundedLogicalReferences() {
         RegistryFriendlyByteBuf buffer = createBuffer();
         try {
-            InventoryWindowPayload.STREAM_CODEC.encode(buffer, InventoryWindowPayload.identities(
-                    List.of(new ItemStack(Items.STONE, 64), ItemStack.EMPTY, new ItemStack(Items.DIRT))));
-            buffer.readerIndex(0);
-
-            InventoryWindowPayload decoded = InventoryWindowPayload.STREAM_CODEC.decode(buffer);
-
-            assertEquals(InventoryWindowPayload.Mode.IDENTITIES, decoded.mode());
-            assertEquals(3, decoded.prototypes().size());
-            assertSame(Items.STONE, decoded.prototypes().get(0).getItem());
-            assertEquals(1, decoded.prototypes().get(0).getCount());
-            assertTrue(decoded.prototypes().get(1).isEmpty());
-            assertSame(Items.DIRT, decoded.prototypes().get(2).getItem());
-        } finally {
-            buffer.release();
-        }
+            List<Integer> slots = java.util.stream.IntStream.range(42, 69).boxed().toList();
+            var payload = new InventoryWindowPayload(7, 12, 3, true, slots);
+            InventoryWindowPayload.STREAM_CODEC.encode(buffer, payload);
+            assertTrue(buffer.writerIndex() < 160);
+            assertEquals(payload, InventoryWindowPayload.STREAM_CODEC.decode(buffer));
+        } finally { buffer.release(); }
     }
 
     @Test
-    void inventoryRangeWindowRoundTripsItsLogicalStart() {
+    void acknowledgementIncludesTheCorrectedMappingAndRequest() {
         RegistryFriendlyByteBuf buffer = createBuffer();
         try {
-            InventoryWindowPayload.STREAM_CODEC.encode(buffer, InventoryWindowPayload.range(18));
-            buffer.readerIndex(0);
-
-            InventoryWindowPayload decoded = InventoryWindowPayload.STREAM_CODEC.decode(buffer);
-
-            assertEquals(InventoryWindowPayload.Mode.RANGE, decoded.mode());
-            assertEquals(18, decoded.firstLogicalSlot());
-            assertTrue(decoded.prototypes().isEmpty());
-        } finally {
-            buffer.release();
-        }
+            var result = new InventoryWindowResultPayload(new InventoryWindowPayload(8, 13, 0, false,
+                    java.util.stream.IntStream.range(9, 36).boxed().toList()), 42);
+            InventoryWindowResultPayload.STREAM_CODEC.encode(buffer, result);
+            assertEquals(result, InventoryWindowResultPayload.STREAM_CODEC.decode(buffer));
+        } finally { buffer.release(); }
     }
 
     @Test
     void browserStateAndBulkTransfersRoundTrip() {
         RegistryFriendlyByteBuf buffer = createBuffer();
         try {
-            BrowserStatePayload.STREAM_CODEC.encode(buffer, new BrowserStatePayload(true));
+            BrowserStatePayload.STREAM_CODEC.encode(buffer, new BrowserStatePayload(true, 7, 0));
             BulkTransferPayload.STREAM_CODEC.encode(buffer, new BulkTransferPayload(
                     BulkTransferPayload.Direction.FROM_CONTAINER, BulkTransferPayload.Target.LOOKED_AT));
             BulkTransferResultPayload.STREAM_CODEC.encode(buffer, new BulkTransferResultPayload(

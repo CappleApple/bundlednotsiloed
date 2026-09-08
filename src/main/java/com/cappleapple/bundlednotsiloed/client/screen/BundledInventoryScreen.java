@@ -23,7 +23,6 @@ import com.cappleapple.bundlednotsiloed.config.ClientConfig;
 import com.cappleapple.bundlednotsiloed.data.InventorySlotWindow;
 import com.cappleapple.bundlednotsiloed.data.ModAttachments;
 import com.cappleapple.bundlednotsiloed.mixin.SlotAccessor;
-import com.cappleapple.bundlednotsiloed.network.BrowserStatePayload;
 import com.cappleapple.bundlednotsiloed.network.InventoryActionPayload;
 import com.cappleapple.bundlednotsiloed.network.InventoryViewPreferencesPayload;
 import com.cappleapple.bundlednotsiloed.network.StowMainGridPayload;
@@ -100,7 +99,7 @@ public final class BundledInventoryScreen extends InventoryScreen {
         capacityPulse.reset();
 
         if (!browserStateSent && minecraft.getConnection() != null) {
-            PacketDistributor.sendToServer(new BrowserStatePayload(true));
+            com.cappleapple.bundlednotsiloed.client.ClientInventoryWindows.open();
             browserStateSent = true;
         }
         ensureInventoryWindow();
@@ -113,7 +112,7 @@ public final class BundledInventoryScreen extends InventoryScreen {
         searchHoverRefocusArmed = true;
         restoreInventorySlotCoordinates();
         if (browserStateSent && minecraft.getConnection() != null) {
-            PacketDistributor.sendToServer(new BrowserStatePayload(false));
+            com.cappleapple.bundlednotsiloed.client.ClientInventoryWindows.close();
         }
         player.getData(ModAttachments.PLAYER_DATA).resetInventoryWindow();
         browserStateSent = false;

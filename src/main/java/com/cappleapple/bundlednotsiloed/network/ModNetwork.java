@@ -31,7 +31,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -47,24 +46,35 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 public final class ModNetwork {
     public static final int SNAPSHOT_CHUNK_SIZE = 256;
-    /** The largest chunk count representable by an int-sized backing collection. */
-    public static final int MAX_SNAPSHOT_CHUNKS = Math.ceilDiv(Integer.MAX_VALUE, SNAPSHOT_CHUNK_SIZE);
+    /** Byte-limited chunks can contain just one logical slot. */
+    public static final int MAX_SNAPSHOT_CHUNKS = Integer.MAX_VALUE;
     public static final int MAX_DELTA_CHANGES = 4096;
     private static final int MAX_PLAYER_CATEGORIES = 256;
     private static final int MAX_CATEGORY_RULES_PER_SIDE = 128;
     private static final int MAX_CATEGORY_NAME_LENGTH = 64;
     private static final int MAX_CATEGORY_REGEX_LENGTH = 512;
     private static final int MAX_CLIENT_ACTIONS_PER_SECOND = 80;
+    private static final Map<UUID, String> REPORTED_SYNC_FAILURES = new ConcurrentHashMap<>();
+    private static final Map<UUID, Long> FAILED_SYNC_RETRY = new ConcurrentHashMap<>();
     private static final Set<UUID> DIRTY_PLAYERS = ConcurrentHashMap.newKeySet();
     private static final Set<UUID> OPEN_BROWSERS = ConcurrentHashMap.newKeySet();
     private static final Map<UUID, SentState> SENT_STATES = new ConcurrentHashMap<>();
     private static final Map<UUID, SnapshotAssembly> CLIENT_SNAPSHOTS = new HashMap<>();
+    private static final Map<UUID, BrowserStatePayload> BROWSER_SESSIONS = new ConcurrentHashMap<>();
+    private static final Map<UUID, InventoryWindowPayload> PENDING_WINDOWS = new ConcurrentHashMap<>();
+    private static final Set<UUID> FULL_SYNC_REQUESTS = ConcurrentHashMap.newKeySet();
+    private static final Map<UUID, Long> NEXT_FULL_SYNC = new ConcurrentHashMap<>();
     private static final Map<UUID, ActionRate> ACTION_RATES = new ConcurrentHashMap<>();
 
     private ModNetwork() {}
 
     public static void registerPayloads(RegisterPayloadHandlersEvent event) {
-        var registrar = event.registrar("11");
+        var registrar = event.registrar("12");
+        registrar.playToClient(InventorySyncStatusPayload.TYPE, InventorySyncStatusPayload.STREAM_CODEC, (payload, context) -> {
+            context.player().getData(ModAttachments.PLAYER_DATA).clientSync().block();
+            context.player().displayClientMessage(Component.translatable("message.bundlednotsiloed.sync_failed",
+                    payload.itemId(), payload.logicalSlot()), false);
+        });
         registrar.playToClient(InventorySnapshotPayload.TYPE, InventorySnapshotPayload.STREAM_CODEC, ModNetwork::receiveSnapshot);
         registrar.playToClient(InventoryDeltaPayload.TYPE, InventoryDeltaPayload.STREAM_CODEC, ModNetwork::receiveDelta);
         registrar.playToClient(PlayerMetadataPayload.TYPE, PlayerMetadataPayload.STREAM_CODEC, ModNetwork::receiveMetadata);
@@ -79,6 +89,8 @@ public final class ModNetwork {
         registrar.playToServer(CategoryEditPayload.TYPE, CategoryEditPayload.STREAM_CODEC, ModNetwork::editCategory);
         registrar.playToServer(HotbarBindPayload.TYPE, HotbarBindPayload.STREAM_CODEC, ModNetwork::bindHotbar);
         registrar.playToServer(InventoryViewPreferencesPayload.TYPE, InventoryViewPreferencesPayload.STREAM_CODEC, ModNetwork::updateViewPreferences);
+        registrar.playToClient(InventoryWindowResultPayload.TYPE, InventoryWindowResultPayload.STREAM_CODEC,
+                (payload, context) -> com.cappleapple.bundlednotsiloed.client.ClientInventoryWindows.acknowledge(payload));
         registrar.playToServer(InventoryWindowPayload.TYPE, InventoryWindowPayload.STREAM_CODEC, ModNetwork::updateInventoryWindow);
         registrar.playToServer(StowSlotPayload.TYPE, StowSlotPayload.STREAM_CODEC, ModNetwork::stowSlot);
         registrar.playToServer(StowMainGridPayload.TYPE, StowMainGridPayload.STREAM_CODEC, ModNetwork::stowMainGrid);
@@ -108,6 +120,22 @@ public final class ModNetwork {
     }
 
     public static void flush(MinecraftServer server) {
+        long now = System.nanoTime();
+        for (UUID id : List.copyOf(FULL_SYNC_REQUESTS)) {
+            if (awaitingRetry(NEXT_FULL_SYNC, id, now)) continue;
+            FULL_SYNC_REQUESTS.remove(id);
+            ServerPlayer player = server.getPlayerList().getPlayer(id);
+            if (player != null) {
+                if (!sendSnapshot(player)) FULL_SYNC_REQUESTS.add(id);
+                NEXT_FULL_SYNC.put(id, now + java.util.concurrent.TimeUnit.SECONDS.toNanos(1));
+                DIRTY_PLAYERS.remove(id);
+            }
+        }
+        for (UUID id : List.copyOf(PENDING_WINDOWS.keySet())) {
+            InventoryWindowPayload window = PENDING_WINDOWS.remove(id);
+            ServerPlayer player = server.getPlayerList().getPlayer(id);
+            if (player != null && window != null) applyInventoryWindow(player, window);
+        }
         if (DIRTY_PLAYERS.isEmpty()) return;
         List<UUID> queued = List.copyOf(DIRTY_PLAYERS);
         DIRTY_PLAYERS.removeAll(queued);
@@ -117,20 +145,36 @@ public final class ModNetwork {
         }
     }
 
+    private static boolean awaitingRetry(Map<UUID, Long> deadlines, UUID id, long now) {
+        Long deadline = deadlines.get(id);
+        return deadline != null && now - deadline < 0;
+    }
+
     public static void forget(UUID playerId) {
         DIRTY_PLAYERS.remove(playerId);
         SENT_STATES.remove(playerId);
         ACTION_RATES.remove(playerId);
         OPEN_BROWSERS.remove(playerId);
+        BROWSER_SESSIONS.remove(playerId);
+        PENDING_WINDOWS.remove(playerId);
+        FULL_SYNC_REQUESTS.remove(playerId);
+        NEXT_FULL_SYNC.remove(playerId);
+        FAILED_SYNC_RETRY.remove(playerId);
+        REPORTED_SYNC_FAILURES.remove(playerId);
     }
+
+    public static void clearClientSync() { CLIENT_SNAPSHOTS.clear(); }
+
+    public static boolean isInventorySyncBlocked(Player player) { return FAILED_SYNC_RETRY.containsKey(player.getUUID()); }
 
     public static boolean isBrowserOpen(Player player) { return OPEN_BROWSERS.contains(player.getUUID()); }
 
-    private static void sendDeltaOrSnapshot(ServerPlayer player) {
+    private static boolean sendDeltaOrSnapshot(ServerPlayer player) {
+        if (awaitingRetry(FAILED_SYNC_RETRY, player.getUUID(), System.nanoTime())) return false;
         DynamicCapacityInventory inventory = player.getData(ModAttachments.PLAYER_DATA).inventory();
         List<ItemStack> current = inventory.backingStacks();
         SentState previous = SENT_STATES.get(player.getUUID());
-        if (previous == null) { sendSnapshot(player); return; }
+        if (previous == null) return sendSnapshot(player);
         ArrayList<InventoryDeltaPayload.SlotChange> changes = new ArrayList<>();
         int compared = Math.min(previous.stacks.size(), current.size());
         for (int i = 0; i < compared; i++) {
@@ -138,24 +182,63 @@ public final class ModNetwork {
         }
         for (int i = compared; i < current.size(); i++) changes.add(new InventoryDeltaPayload.SlotChange(i, current.get(i)));
         if (changes.size() > MAX_DELTA_CHANGES || changes.size() > Math.max(64, current.size() / 2)) {
-            sendSnapshot(player);
-            return;
+            return sendSnapshot(player);
         }
+        long changedBytes = 0;
+        for (var change : changes) {
+            int bytes = validateSyncStack(player, change.index(), change.stack());
+            if (bytes < 0) return false;
+            changedBytes += bytes;
+        }
+        if (changedBytes > InventorySnapshotPlan.TARGET_BYTES) return sendSnapshot(player);
         PacketDistributor.sendToPlayer(player, new InventoryDeltaPayload(previous.revision, inventory.revision(), current.size(), changes));
         SENT_STATES.put(player.getUUID(), new SentState(inventory.revision(), current));
+        FAILED_SYNC_RETRY.remove(player.getUUID());
+        REPORTED_SYNC_FAILURES.remove(player.getUUID());
+        return true;
     }
 
-    private static void sendSnapshot(ServerPlayer player) {
+    private static boolean sendSnapshot(ServerPlayer player) {
+        if (awaitingRetry(FAILED_SYNC_RETRY, player.getUUID(), System.nanoTime())) return false;
         DynamicCapacityInventory inventory = player.getData(ModAttachments.PLAYER_DATA).inventory();
         List<ItemStack> stacks = inventory.backingStacks();
-        int chunkCount = Math.max(1, Math.ceilDiv(stacks.size(), SNAPSHOT_CHUNK_SIZE));
+        // Validate all items before sending the first chunk. Bound batches by bytes as well as slot count.
+        List<Integer> sizes = new ArrayList<>(stacks.size());
+        for (int i = 0; i < stacks.size(); i++) {
+            int bytes = validateSyncStack(player, i, stacks.get(i));
+            if (bytes < 0) return false;
+            sizes.add(bytes);
+        }
+        var chunks = InventorySnapshotPlan.chunks(sizes);
         UUID snapshotId = UUID.randomUUID();
-        for (int chunk = 0; chunk < chunkCount; chunk++) {
-            int from = chunk * SNAPSHOT_CHUNK_SIZE;
-            int to = (int)Math.min((long)stacks.size(), (long)from + SNAPSHOT_CHUNK_SIZE);
-            PacketDistributor.sendToPlayer(player, new InventorySnapshotPayload(snapshotId, inventory.revision(), chunk, chunkCount, stacks.subList(from, to)));
+        for (int index = 0; index < chunks.size(); index++) {
+            var chunk = chunks.get(index);
+            PacketDistributor.sendToPlayer(player, new InventorySnapshotPayload(snapshotId, inventory.revision(),
+                    index, chunks.size(), stacks.subList(chunk.from(), chunk.to())));
         }
         SENT_STATES.put(player.getUUID(), new SentState(inventory.revision(), stacks));
+        FAILED_SYNC_RETRY.remove(player.getUUID());
+        REPORTED_SYNC_FAILURES.remove(player.getUUID());
+        return true;
+    }
+
+    private static int validateSyncStack(ServerPlayer player, int slot, ItemStack stack) {
+        try {
+            return InventorySyncPreflight.encodedSize(player.registryAccess(), stack);
+        } catch (RuntimeException exception) {
+            String itemId = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
+            String problem = slot + ":" + itemId;
+            if (!problem.equals(REPORTED_SYNC_FAILURES.put(player.getUUID(), problem))) {
+                BundledNotSiloed.LOGGER.error("Inventory sync paused for player {} ({}) at logical slot {}, item {}. "
+                    + "The item remains in server storage; its network codec failed preflight.",
+                        player.getGameProfile().getName(), player.getUUID(), slot, itemId, exception);
+                PacketDistributor.sendToPlayer(player, new InventorySyncStatusPayload(slot,
+                        itemId.substring(0, Math.min(256, itemId.length()))));
+            }
+            FAILED_SYNC_RETRY.put(player.getUUID(), System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5));
+            FULL_SYNC_REQUESTS.add(player.getUUID());
+            return -1;
+        }
     }
 
     private static void receiveSnapshot(InventorySnapshotPayload payload, IPayloadContext context) {
@@ -171,20 +254,23 @@ public final class ModNetwork {
             ArrayList<ItemStack> stacks = new ArrayList<>();
             for (int i = 0; i < assembly.chunkCount; i++) stacks.addAll(assembly.chunks.get(i));
             PlayerInventoryData data = context.player().getData(ModAttachments.PLAYER_DATA);
-            data.inventory().loadNetworkSnapshot(stacks, assembly.revision);
+            data.clientSync().snapshot(data.inventory(), assembly.revision, stacks);
             data.setMigratedVanillaInventory();
+            com.cappleapple.bundlednotsiloed.client.ClientInventoryWindows.inventorySynced();
             CLIENT_SNAPSHOTS.remove(payload.snapshotId());
         }
     }
 
     private static void receiveDelta(InventoryDeltaPayload payload, IPayloadContext context) {
-        Map<Integer, ItemStack> changes = new LinkedHashMap<>();
-        for (InventoryDeltaPayload.SlotChange change : payload.changes()) changes.put(change.index(), change.stack());
         PlayerInventoryData data = context.player().getData(ModAttachments.PLAYER_DATA);
-        boolean applied = data.inventory().applyNetworkDelta(
-                payload.baseRevision(), payload.revision(), payload.resultingSize(), changes);
-        if (applied) data.syncVanillaCompatibilityView();
-        if (!applied) PacketDistributor.sendToServer(new RequestFullSyncPayload());
+        boolean applied = data.clientSync().delta(data.inventory(), payload);
+        if (applied) {
+            data.syncVanillaCompatibilityView();
+            com.cappleapple.bundlednotsiloed.client.ClientInventoryWindows.inventorySynced();
+        }
+        if (!applied && data.clientSync().requestRecovery(System.nanoTime())) {
+            PacketDistributor.sendToServer(new RequestFullSyncPayload());
+        }
     }
 
     private static void receiveMetadata(PlayerMetadataPayload payload, IPayloadContext context) {
@@ -248,7 +334,7 @@ public final class ModNetwork {
     }
 
     private static void requestFullSync(RequestFullSyncPayload payload, IPayloadContext context) {
-        if (context.player() instanceof ServerPlayer player) sendSnapshot(player);
+        if (context.player() instanceof ServerPlayer player) FULL_SYNC_REQUESTS.add(player.getUUID());
     }
 
     private static void inventoryAction(InventoryActionPayload payload, IPayloadContext context) {
@@ -282,6 +368,7 @@ public final class ModNetwork {
 
     private static void cycleHotbar(HotbarCyclePayload payload, IPayloadContext context) {
         if (!(context.player() instanceof ServerPlayer player) || !allowAction(player)) return;
+        if (com.cappleapple.bundlednotsiloed.compat.OpenBackpackGuard.blocksArrangement(player)) return;
         if (payload.slot() < 0 || payload.slot() >= 9 || Math.abs(payload.direction()) != 1) return;
         PlayerInventoryData data = player.getData(ModAttachments.PLAYER_DATA);
         ItemStack selected = data.hotbar().cycle(payload.slot(), payload.direction(), data.inventory(), data.categories());
@@ -296,6 +383,7 @@ public final class ModNetwork {
     }
 
     private static boolean allowAction(ServerPlayer player) {
+        if (isInventorySyncBlocked(player)) return false;
         long second = System.currentTimeMillis() / 1000L;
         ActionRate rate = ACTION_RATES.computeIfAbsent(player.getUUID(), ignored -> new ActionRate());
         if (rate.second != second) { rate.second = second; rate.count = 0; }
@@ -354,28 +442,47 @@ public final class ModNetwork {
         if (payload.selectedCategory() != null && data.categories().find(payload.selectedCategory()) == null) return;
         data.setInventorySortPreference(payload.sortMode());
         data.setSelectedCategoryPreference(payload.selectedCategory());
-        InventoryProjection.applyExplicitView(data);
+        if (!com.cappleapple.bundlednotsiloed.compat.OpenBackpackGuard.blocksArrangement(player)) InventoryProjection.applyExplicitView(data);
         sendMetadata(player);
         player.inventoryMenu.broadcastChanges();
     }
 
     private static void updateInventoryWindow(InventoryWindowPayload payload, IPayloadContext context) {
-        if (!(context.player() instanceof ServerPlayer player) || !allowAction(player)
-                || !isBrowserOpen(player)) return;
+        if (!(context.player() instanceof ServerPlayer player)) return;
+        BrowserStatePayload session = BROWSER_SESSIONS.get(player.getUUID());
+        if (session == null || session.session() != payload.session()
+                || session.containerId() != payload.containerId() || player.containerMenu.containerId != payload.containerId()) return;
+        // Coalesce navigation separately from gameplay actions; never silently drop the final page.
+        PENDING_WINDOWS.put(player.getUUID(), payload);
+    }
+
+    private static void applyInventoryWindow(ServerPlayer player, InventoryWindowPayload payload) {
+        BrowserStatePayload session = BROWSER_SESSIONS.get(player.getUUID());
+        if (session == null || session.session() != payload.session()
+                || player.containerMenu.containerId != payload.containerId()) return;
         PlayerInventoryData data = player.getData(ModAttachments.PLAYER_DATA);
-        if (payload.mode() == InventoryWindowPayload.Mode.RANGE) {
-            if (payload.firstLogicalSlot() > InventorySlotWindow.maximumRangeStart(
-                    data.inventory().syntheticSlotCount())) return;
-            data.showInventoryRange(payload.firstLogicalSlot());
-        } else {
-            data.showInventoryWindow(payload.prototypes());
+        long maximum = (long)Math.max(InventorySlotWindow.MAIN_START, data.inventory().syntheticSlotCount())
+                + InventorySlotWindow.VISIBLE_SLOTS;
+        List<Integer> slots = payload.slots();
+        if (slots.stream().anyMatch(index -> index >= maximum)) {
+            // A shrink can invalidate a requested page. Return an explicit correction.
+            int first = InventorySlotWindow.maximumRangeStart(data.inventory().syntheticSlotCount());
+            slots = java.util.stream.IntStream.range(first, first + InventorySlotWindow.VISIBLE_SLOTS).boxed().toList();
         }
+        if (!sendDeltaOrSnapshot(player)) {
+            PENDING_WINDOWS.put(player.getUUID(), payload);
+            return;
+        }
+        data.showInventorySlots(slots, payload.identities());
+        PacketDistributor.sendToPlayer(player, new InventoryWindowResultPayload(new InventoryWindowPayload(
+                payload.session(), payload.request(), payload.containerId(), payload.identities(), slots), data.inventory().revision()));
         player.containerMenu.broadcastChanges();
     }
 
     private static void stowSlot(StowSlotPayload payload, IPayloadContext context) {
         if (!(context.player() instanceof ServerPlayer player) || !allowAction(player)
                 || payload.slot() < -1 || payload.slot() >= 36) return;
+        if (com.cappleapple.bundlednotsiloed.compat.OpenBackpackGuard.blocksArrangement(player)) return;
         PlayerInventoryData data = player.getData(ModAttachments.PLAYER_DATA);
         if (payload.slot() >= 0) {
             if (data.inventory().stowSyntheticSlot(payload.slot())) player.containerMenu.broadcastChanges();
@@ -434,16 +541,19 @@ public final class ModNetwork {
 
     private static void transferRecipe(RecipeTransferPayload payload, IPayloadContext context) {
         if (!(context.player() instanceof ServerPlayer player) || !allowAction(player)) return;
+        if (com.cappleapple.bundlednotsiloed.compat.OpenBackpackGuard.blocksArrangement(player)) return;
         RecipeTransferService.transfer(player, payload.recipeId(), payload.placeAll(), payload.destination());
     }
 
     private static void stowMainGrid(StowMainGridPayload payload, IPayloadContext context) {
         if (!(context.player() instanceof ServerPlayer player) || !allowAction(player)) return;
+        if (com.cappleapple.bundlednotsiloed.compat.OpenBackpackGuard.blocksArrangement(player)) return;
         if (player.getData(ModAttachments.PLAYER_DATA).inventory().stowMainGrid()) player.containerMenu.broadcastChanges();
     }
 
     private static void clearCreativeInventory(ClearCreativeInventoryPayload payload, IPayloadContext context) {
         if (!(context.player() instanceof ServerPlayer player) || !player.gameMode.isCreative() || !allowAction(player)) return;
+        if (com.cappleapple.bundlednotsiloed.compat.OpenBackpackGuard.blocksArrangement(player)) return;
         player.getData(ModAttachments.PLAYER_DATA).inventory().clear();
         player.inventoryMenu.broadcastChanges();
     }
@@ -454,10 +564,18 @@ public final class ModNetwork {
     }
 
     private static void browserState(BrowserStatePayload payload, IPayloadContext context) {
-        if (!(context.player() instanceof ServerPlayer player) || !allowAction(player)) return;
-        if (payload.open()) OPEN_BROWSERS.add(player.getUUID());
-        else {
+        if (!(context.player() instanceof ServerPlayer player)) return;
+        BrowserStatePayload current = BROWSER_SESSIONS.get(player.getUUID());
+        if (payload.open()) {
+            if (player.containerMenu.containerId != payload.containerId()
+                    || current != null && current.session() >= payload.session()) return;
+            BROWSER_SESSIONS.put(player.getUUID(), payload);
+            OPEN_BROWSERS.add(player.getUUID());
+            PENDING_WINDOWS.remove(player.getUUID());
+        } else if (current != null && current.session() == payload.session()) {
+            BROWSER_SESSIONS.remove(player.getUUID());
             OPEN_BROWSERS.remove(player.getUUID());
+            PENDING_WINDOWS.remove(player.getUUID());
             player.getData(ModAttachments.PLAYER_DATA).resetInventoryWindow();
             player.containerMenu.broadcastChanges();
         }

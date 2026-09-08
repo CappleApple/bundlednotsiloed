@@ -11,7 +11,8 @@
     "ItemEntityMixin",
     "PlayerMixin",
     "RecipeBookAccessor",
-    "SlotMixin"
+    "SlotMixin",
+    "SophisticatedBackpackContextMixin"
   ],
   "client": [
     "AbstractContainerScreenMixin",
@@ -19,7 +20,9 @@
     "GuiMixin",
     "KeyMappingMixin",
     "MouseHandlerMixin",
-    "SlotAccessor"
+    "SlotAccessor",
+    "MultiPlayerGameModeMixin",
+    "ClientPacketListenerMixin"
   ],
   "injectors": {
     "defaultRequire": 1

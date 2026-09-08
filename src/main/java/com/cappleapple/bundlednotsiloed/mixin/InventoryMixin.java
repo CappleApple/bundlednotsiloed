@@ -120,7 +120,9 @@ public abstract class InventoryMixin {
         if (!sns$active() || slot < 0 || slot >= Inventory.INVENTORY_SIZE) return;
         DynamicCapacityInventory inventory = sns$data().inventory();
         int index = sns$logicalIndex(slot);
-        inventory.replaceSyntheticSlotFromItemUse(index, stack);
+        if (!ItemStack.matches(inventory.vanillaStackReference(index), stack)) {
+            inventory.replaceSyntheticSlotFromItemUse(index, stack);
+        }
         callback.cancel();
     }
 

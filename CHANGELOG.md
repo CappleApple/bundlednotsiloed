@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.4.3 - 2026-09-08
+
+### Fixed
+
+- Predicted inventory clicks and vanilla slot updates no longer invalidate the server's delta baseline or trigger repeated full-inventory synchronization.
+- Search and scrolling now use acknowledged logical slot references, preventing changing item metadata, delayed updates, and dropped navigation from mapping clicks to different slots on the client and server.
+- Hover-opening Sophisticated Backpacks now retains the correct logical backpack slot across screen changes. Open backpacks are protected from pickup, swapping, extraction, and bulk transfer; inventory arrangement requires closing the backpack first.
+- Inventory snapshots now split by encoded data size as well as item count. BNS pauses synchronization of invalid or oversized item data before sending a failing inventory packet, preserves server-side items, and reports the affected item and logical slot.
+
 ## 1.4.2 - 2026-09-03
 
 ### Changed

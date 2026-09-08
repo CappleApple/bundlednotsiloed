@@ -39,6 +39,11 @@ public final class ClientEvents {
                 "tooltip.bundlednotsiloed.exact_inventory_count", count).withStyle(ChatFormatting.GRAY));
     }
 
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void awaitWindowKey(ScreenEvent.KeyPressed.Pre event) {
+        if (ClientInventoryWindows.pending() && !InventorySearchInputCapture.isTyping() && event.getKeyCode() != org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) event.setCanceled(true);
+    }
+
     @SubscribeEvent
     public static void playerLoggingIn(ClientPlayerNetworkEvent.LoggingIn event) {
         ClientSaveState.beginConnection(event.getPlayer());
@@ -47,6 +52,8 @@ public final class ClientEvents {
     @SubscribeEvent
     public static void playerLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
         ClientSaveState.endConnection();
+        ClientInventoryWindows.reset();
+        com.cappleapple.bundlednotsiloed.network.ModNetwork.clearClientSync();
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)

@@ -96,5 +96,7 @@
   "message.bundlednotsiloed.auto_refill_off": "Stowed stack auto-refill disabled",
   "message.bundlednotsiloed.recipe_missing": "Not enough ingredients in the unified inventory",
   "message.bundlednotsiloed.recipe_too_large": "This recipe does not fit the open crafting grid",
-  "message.bundlednotsiloed.unsafe_sophisticated_binding": "Sophisticated Core's %s control is bound to plain left-click and is blocking its inventory UI. Rebind it under Controls."
+  "message.bundlednotsiloed.unsafe_sophisticated_binding": "Sophisticated Core's %s control is bound to plain left-click and is blocking its inventory UI. Rebind it under Controls.",
+  "message.bundlednotsiloed.close_backpack_to_arrange": "Close your backpack before rearranging the inventory.",
+  "message.bundlednotsiloed.sync_failed": "Inventory sync paused: %s at logical slot %s has invalid or oversized network data. Your items are preserved on the server. Ask an administrator to check the server log."
 }

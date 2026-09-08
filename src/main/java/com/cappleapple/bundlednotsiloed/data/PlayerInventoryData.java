@@ -22,6 +22,8 @@ public final class PlayerInventoryData implements INBTSerializable<CompoundTag> 
     private final Player owner;
     private final DynamicCapacityInventory inventory;
     private final InventorySlotWindow inventoryWindow = new InventorySlotWindow();
+    private final com.cappleapple.bundlednotsiloed.network.ClientInventorySync clientSync =
+            new com.cappleapple.bundlednotsiloed.network.ClientInventorySync();
     private final PlayerCategoryData categories = new PlayerCategoryData();
     private final HotbarBindings hotbar = new HotbarBindings();
     private final RecentInventoryChanges recentChanges = new RecentInventoryChanges();
@@ -35,11 +37,17 @@ public final class PlayerInventoryData implements INBTSerializable<CompoundTag> 
 
     public PlayerInventoryData(Player owner) {
         this.owner = owner;
-        this.inventory = new DynamicCapacityInventory(this::effectiveCapacity, this::onInventoryChanged);
+        this.inventory = new DynamicCapacityInventory(this::effectiveCapacity, this::onInventoryChanged,
+                stack -> true, stack -> !com.cappleapple.bundlednotsiloed.compat.OpenBackpackGuard.protects(owner, stack));
     }
 
     public DynamicCapacityInventory inventory() { return inventory; }
     public InventorySlotWindow inventoryWindow() { return inventoryWindow; }
+    public com.cappleapple.bundlednotsiloed.network.ClientInventorySync clientSync() { return clientSync; }
+    public void showInventorySlots(List<Integer> slots, boolean identities) {
+        inventoryWindow.showSlots(slots, identities);
+        syncVanillaCompatibilityView();
+    }
     public PlayerCategoryData categories() { return categories; }
     public HotbarBindings hotbar() { return hotbar; }
     public boolean migratedVanillaInventory() { return migratedVanillaInventory; }
@@ -149,7 +157,7 @@ public final class PlayerInventoryData implements INBTSerializable<CompoundTag> 
         for (int vanillaSlot = 0; vanillaSlot < visibleSlots; vanillaSlot++) {
             int logicalSlot = inventoryWindow.logicalIndex(vanillaSlot);
             ItemStack exposed = vanillaItems.get(vanillaSlot);
-            if (exposed != inventory.vanillaStackReference(logicalSlot)) {
+            if (!ItemStack.matches(exposed, inventory.vanillaStackReference(logicalSlot))) {
                 replacements.add(new Replacement(logicalSlot, exposed.copy()));
             }
         }

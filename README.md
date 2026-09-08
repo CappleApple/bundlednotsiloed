@@ -65,7 +65,7 @@ Linux/macOS:
 ./gradlew runServer
 ```
 
-The built mod is written to `build/libs/bundlednotsiloed-1.4.2.jar`. The project uses official Mojang mappings with Parchment parameter names and ModDevGradle's Minecraft-aware JUnit support.
+The built mod is written to `build/libs/bundlednotsiloed-1.4.3.jar`. The project uses official Mojang mappings with Parchment parameter names and ModDevGradle's Minecraft-aware JUnit support.
 
 ## Player usage
 
@@ -182,6 +182,11 @@ Use vanilla `/attribute` commands for capacity modifiers.
 The player integration entry point is `com.cappleapple.bundlednotsiloed.api.BundledNotSiloedApi`. General inventory creation, transactions, serialization, transfers, and cost-provider registration are supplied by `com.cappleapple.stacksnotslots.api.StacksNotSlotsApi`. See [docs/API.md](docs/API.md).
 
 ## Compatibility notes
+
+- Install BNS 1.4.3 on both the server and every client: the acknowledged inventory-window protocol is incompatible with earlier versions.
+- Navigation sends logical slot references and waits for server confirmation before accepting inventory interactions. Inventory deltas use a separate server baseline, so client prediction and late vanilla slot echoes cannot invalidate or overwrite it.
+- Sophisticated Backpacks can be opened from the hovered inventory slot or through its normal discovery hotkey. The open root backpack is protected while its menu is open, including when viewing a nested backpack; close it before sorting, stowing the grid, or cycling the hotbar.
+- BNS validates inventory item codecs before sending a snapshot or delta and splits snapshots around a 256 KiB item-data target (a single valid item can exceed that target). If an item fails validation, synchronization pauses, the player sees a diagnostic, and the server log identifies the player, logical slot, item ID, and codec error. Items and components remain in server storage; synchronization retries automatically after the item is repaired. This protects BNS inventory packets and does not override vanilla or other mods' packet codecs.
 
 - The complete dynamic inventory is exposed through NeoForge's player entity item-handler capabilities.
 - Empty compatibility positions are retained as sparse holes, so explicit vanilla/API slot placement remains stable across inventory changes and persistence.

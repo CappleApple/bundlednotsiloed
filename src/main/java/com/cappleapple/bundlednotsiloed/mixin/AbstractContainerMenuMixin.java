@@ -61,6 +61,34 @@ public abstract class AbstractContainerMenuMixin {
         callback.setReturnValue(true);
     }
 
+    /** Preserve menu state and cursor updates without replaying obsolete player-slot projections. */
+    @org.spongepowered.asm.mixin.injection.Redirect(method = {"setItem", "initializeContents"},
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/world/inventory/Slot;set(Lnet/minecraft/world/item/ItemStack;)V"))
+    private void bns$keepAuthoritativePlayerSlots(Slot slot, ItemStack stack) {
+        if (slot.container instanceof net.minecraft.world.entity.player.Inventory inventory
+                && inventory.player.level().isClientSide
+                && inventory.player.getData(ModAttachments.PLAYER_DATA).migratedVanillaInventory()
+                && slot.getContainerSlot() >= 0 && slot.getContainerSlot() < 36) return;
+        slot.set(stack);
+    }
+
+    /** Covers swap keys as well as menu overrides that bypass Slot.mayPickup. */
+    @Inject(method = "clicked", at = @At("HEAD"), cancellable = true)
+    private void bns$protectOpenBackpack(int slotId, int button, ClickType type, Player player, CallbackInfo callback) {
+        if (!player.level().isClientSide && com.cappleapple.bundlednotsiloed.network.ModNetwork.isInventorySyncBlocked(player)) {
+            callback.cancel();
+            return;
+        }
+        int locked = com.cappleapple.bundlednotsiloed.compat.OpenBackpackGuard.logicalSlot(player);
+        if (locked < 0) return;
+        var window = player.getData(ModAttachments.PLAYER_DATA).inventoryWindow();
+        boolean source = slotId >= 0 && slotId < slots.size() && slots.get(slotId).container == player.getInventory()
+                && slots.get(slotId).getContainerSlot() >= 0 && slots.get(slotId).getContainerSlot() < 36
+                && window.logicalIndex(slots.get(slotId).getContainerSlot()) == locked;
+        boolean swapTarget = type == ClickType.SWAP && button >= 0 && button < 9 && button == locked;
+        if (source || swapTarget) callback.cancel();
+    }
+
     /** Captures custom-menu quick moves which bypass vanilla's moveItemStackTo helper. */
     @Inject(method = "clicked", at = @At("HEAD"))
     private void sns$captureExternalQuickMove(int slotId, int button, ClickType clickType, Player player,

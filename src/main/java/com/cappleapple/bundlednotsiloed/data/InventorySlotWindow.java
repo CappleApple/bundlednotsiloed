@@ -21,6 +21,7 @@ public final class InventorySlotWindow {
     private List<ItemStack> requested = emptyPage();
     private boolean active;
     private boolean identityView;
+    private boolean fixedReferences;
 
     public InventorySlotWindow() {
         resetMapping();
@@ -35,6 +36,7 @@ public final class InventorySlotWindow {
     }
 
     public void show(List<ItemStack> prototypes, DynamicCapacityInventory inventory) {
+        fixedReferences = false;
         requested = normalize(prototypes);
         active = true;
         identityView = true;
@@ -59,7 +61,24 @@ public final class InventorySlotWindow {
     }
 
     public void refresh(DynamicCapacityInventory inventory) {
-        if (identityView()) resolveIdentities(inventory);
+        if (identityView() && !fixedReferences) resolveIdentities(inventory);
+    }
+
+    /** Acknowledged references never re-resolve mutable components behind the other peer's back. */
+    public void showSlots(List<Integer> slots, boolean identities) {
+        if (slots.size() != VISIBLE_SLOTS || new HashSet<>(slots).size() != VISIBLE_SLOTS
+                || slots.stream().anyMatch(index -> index < MAIN_START || index == Integer.MAX_VALUE)) {
+            throw new IllegalArgumentException("Invalid logical inventory slots");
+        }
+        active = true;
+        identityView = identities;
+        fixedReferences = true;
+        requested = emptyPage();
+        for (int i = 0; i < VISIBLE_SLOTS; i++) logicalSlots[i] = slots.get(i);
+    }
+
+    public List<Integer> logicalSlots() {
+        return java.util.Arrays.stream(logicalSlots).boxed().toList();
     }
 
     public void reset() {

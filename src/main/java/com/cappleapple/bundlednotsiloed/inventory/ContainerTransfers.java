@@ -49,6 +49,7 @@ public final class ContainerTransfers {
             ItemStack prototype,
             BrowserTransferPayload.Mode mode
     ) {
+        if (com.cappleapple.bundlednotsiloed.compat.OpenBackpackGuard.protects(player, prototype)) return 0;
         DynamicCapacityInventory inventory = player.getData(ModAttachments.PLAYER_DATA).inventory();
         if (player.containerMenu == player.inventoryMenu) {
             return inventory.moveBackendStackToMain(prototype) ? 1 : 0;
@@ -127,6 +128,7 @@ public final class ContainerTransfers {
         DynamicCapacityInventory inventory = player.getData(ModAttachments.PLAYER_DATA).inventory();
         TransferAccumulator moved = new TransferAccumulator();
         for (ItemStack owned : dumpableStacks(inventory)) {
+            if (com.cappleapple.bundlednotsiloed.compat.OpenBackpackGuard.protects(player, owned)) continue;
             if (owned.isEmpty()) continue;
             ItemStack moving = owned.copy();
             int before = moving.getCount();
@@ -168,6 +170,7 @@ public final class ContainerTransfers {
         DynamicCapacityInventory inventory = player.getData(ModAttachments.PLAYER_DATA).inventory();
         TransferAccumulator moved = new TransferAccumulator();
         for (ItemStack owned : dumpableStacks(inventory)) {
+            if (com.cappleapple.bundlednotsiloed.compat.OpenBackpackGuard.protects(player, owned)) continue;
             if (owned.isEmpty()) continue;
             ItemStack remainder = ItemHandlerHelper.insertItemStacked(handler, owned.copy(), false);
             int accepted = owned.getCount() - remainder.getCount();
