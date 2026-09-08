@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.4 - 2026-09-08
+
+### Added
+
+- Added a Sort inventory button between Categories and Settings on the expanded inventory side rail. Clicking it reapplies the active category exactly like selecting that category again, in both player inventories and compatible containers.
+
 ## 1.4.3 - 2026-09-08
 
 ### Fixed

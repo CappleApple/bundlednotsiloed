@@ -139,6 +139,8 @@ public final class BundledInventoryScreen extends InventoryScreen {
         InventoryBrowserControls.renderButton(graphics, rail.settingsX(), rail.settingsY(),
                 InventoryBrowserControls.configuredIcon(ClientConfig.SETTINGS_ICON.get()),
                 settingsMenuOpen || rail.settingsContains(mouseX, mouseY));
+        InventoryBrowserControls.renderSortButton(graphics, rail.sortX(), rail.sortY(),
+                rail.sortContains(mouseX, mouseY));
         capacityPulse.render(graphics,
                 x + InventoryScreenLayout.GRID_X,
                 y + InventoryScreenLayout.FULLNESS_Y,
@@ -222,6 +224,14 @@ public final class BundledInventoryScreen extends InventoryScreen {
             categoryMenuOpen = !categoryMenuOpen;
             settingsMenuOpen = false;
             categoryScrollRow = 0;
+            return true;
+        }
+        if (rail.sortContains(mouseX, mouseY)) {
+            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+                categoryMenuOpen = false;
+                settingsMenuOpen = false;
+                selectCategory(currentCategory());
+            }
             return true;
         }
         if (rail.settingsContains(mouseX, mouseY)) {
@@ -376,7 +386,8 @@ public final class BundledInventoryScreen extends InventoryScreen {
 
     private boolean isSearchBlockingTarget(double mouseX, double mouseY) {
         Rail rail = sideRail();
-        if (rail.categoryContains(mouseX, mouseY) || rail.settingsContains(mouseX, mouseY)) {
+        if (rail.categoryContains(mouseX, mouseY) || rail.settingsContains(mouseX, mouseY)
+                || rail.sortContains(mouseX, mouseY)) {
             return true;
         }
         double localX = mouseX - this.leftPos;
@@ -524,6 +535,8 @@ public final class BundledInventoryScreen extends InventoryScreen {
                     : List.of(categoryName);
         } else if (rail.settingsContains(mouseX, mouseY)) {
             hoveredTooltip = List.of(Component.translatable("gui.bundlednotsiloed.inventory_menu"));
+        } else if (rail.sortContains(mouseX, mouseY)) {
+            hoveredTooltip = InventoryBrowserControls.sortTooltip(Screen.hasShiftDown());
         } else if (rail.searchContains(mouseX, mouseY)) {
             hoveredTooltip = InventorySearchBar.tooltip(
                     player.getData(ModAttachments.PLAYER_DATA).inventory(), Screen.hasShiftDown());

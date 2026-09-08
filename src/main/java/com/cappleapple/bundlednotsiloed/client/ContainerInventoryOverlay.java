@@ -184,6 +184,17 @@ public final class ContainerInventoryOverlay {
             categoryScrollRow = 0;
             return true;
         }
+        if (activeGrid.sortContains(mouseX, mouseY)) {
+            consumedReleaseButton = button;
+            clearSearchFocus();
+            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+                categoryMenuOpen = false;
+                settingsMenuOpen = false;
+                selectCategory(InventoryBrowserControls.currentCategory(
+                        minecraft.player.getData(ModAttachments.PLAYER_DATA)));
+            }
+            return true;
+        }
         if (activeGrid.settingsContains(mouseX, mouseY)) {
             consumedReleaseButton = button;
             clearSearchFocus();
@@ -461,6 +472,8 @@ public final class ContainerInventoryOverlay {
                 rail.settingsX(), rail.settingsY(),
                 InventoryBrowserControls.configuredIcon(ClientConfig.SETTINGS_ICON.get()),
                 settingsMenuOpen || settingsHovered);
+        InventoryBrowserControls.renderSortButton(graphics, rail.sortX(), rail.sortY(),
+                activeGrid.sortContains(mouseX, mouseY));
         if (searchFocused) {
             InventorySideRail.renderExpandedSearch(graphics, minecraft.font, rail, SEARCH.value(),
                     SEARCH.allSelected(), ItemSearchExpression.parse(SEARCH.value()).valid(),
@@ -483,6 +496,8 @@ public final class ContainerInventoryOverlay {
                     : List.of(categoryName);
         } else if (settingsHovered) {
             hoveredTooltip = List.of(Component.translatable("gui.bundlednotsiloed.inventory_menu"));
+        } else if (activeGrid.sortContains(mouseX, mouseY)) {
+            hoveredTooltip = InventoryBrowserControls.sortTooltip(Screen.hasShiftDown());
         }
     }
 
@@ -523,6 +538,7 @@ public final class ContainerInventoryOverlay {
         if (activeGrid == null || activeScreen == null) return false;
         if (activeGrid.categoryContains(mouseX, mouseY)
                 || activeGrid.settingsContains(mouseX, mouseY)
+                || activeGrid.sortContains(mouseX, mouseY)
                 || activeGrid.scrollbarContains(mouseX, mouseY)
                 || (categoryMenuOpen && activeGrid.categoryPopupContains(mouseX, mouseY))
                 || (settingsMenuOpen && activeGrid.settingsPopupContains(mouseX, mouseY))
@@ -866,6 +882,9 @@ public final class ContainerInventoryOverlay {
         }
         boolean settingsContains(double x, double y) {
             return rail().settingsContains(x, y);
+        }
+        boolean sortContains(double x, double y) {
+            return rail().sortContains(x, y);
         }
         boolean categoryPopupContains(double x, double y) {
             return InventoryScreenLayout.inside(x, y, categoryPopupX(), categoryPopupY(),

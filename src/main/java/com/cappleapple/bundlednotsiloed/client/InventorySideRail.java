@@ -9,8 +9,8 @@ public final class InventorySideRail {
     public static final int BUTTON_GAP = 2;
     public static final int PADDING = 3;
     public static final int WIDTH = InventoryBrowserControls.SIZE + PADDING * 2;
-    public static final int HEIGHT = PADDING * 2 + InventoryBrowserControls.SIZE * 3
-            + BUTTON_GAP * 2;
+    public static final int HEIGHT = PADDING * 2 + InventoryBrowserControls.SIZE * 4
+            + BUTTON_GAP * 3;
     private static final int MAX_SEARCH_TEXT_WIDTH = 160;
 
     private InventorySideRail() {}
@@ -62,8 +62,10 @@ public final class InventorySideRail {
         public int searchY() { return buttonTop; }
         public int categoryX() { return buttonX; }
         public int categoryY() { return buttonTop + InventoryBrowserControls.SIZE + BUTTON_GAP; }
+        public int sortX() { return buttonX; }
+        public int sortY() { return categoryY() + InventoryBrowserControls.SIZE + BUTTON_GAP; }
         public int settingsX() { return buttonX; }
-        public int settingsY() { return categoryY() + InventoryBrowserControls.SIZE + BUTTON_GAP; }
+        public int settingsY() { return sortY() + InventoryBrowserControls.SIZE + BUTTON_GAP; }
 
         public void renderBackground(GuiGraphics graphics) {
             graphics.fill(left + 2, top, right, bottom, 0xFF373737);
@@ -84,6 +86,10 @@ public final class InventorySideRail {
         }
         public boolean settingsContains(double x, double y) {
             return contains(x, y, settingsX(), settingsY());
+        }
+
+        public boolean sortContains(double x, double y) {
+            return contains(x, y, sortX(), sortY());
         }
 
         private boolean contains(double x, double y, int buttonX, int buttonY) {

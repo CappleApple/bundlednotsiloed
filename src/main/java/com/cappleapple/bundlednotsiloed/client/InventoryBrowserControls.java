@@ -49,6 +49,24 @@ public final class InventoryBrowserControls {
         graphics.pose().popPose();
     }
 
+    /** Descending rows and a down arrow make the one-shot sort action recognizable at button scale. */
+    public static void renderSortButton(GuiGraphics graphics, int x, int y, boolean highlighted) {
+        renderButtonBackground(graphics, x, y, highlighted);
+        int color = 0xFF303030;
+        graphics.fill(x + 2, y + 3, x + 8, y + 4, color);
+        graphics.fill(x + 2, y + 6, x + 6, y + 7, color);
+        graphics.fill(x + 2, y + 9, x + 4, y + 10, color);
+        graphics.fill(x + 9, y + 3, x + 10, y + 9, color);
+        graphics.fill(x + 8, y + 8, x + 11, y + 9, color);
+        graphics.fill(x + 9, y + 9, x + 10, y + 10, color);
+    }
+
+    public static List<Component> sortTooltip(boolean detailed) {
+        Component title = Component.translatable("gui.bundlednotsiloed.sort_inventory");
+        return detailed ? List.of(title, Component.translatable("tooltip.bundlednotsiloed.sort_inventory"))
+                : List.of(title);
+    }
+
     public static void renderButtonBackground(
             GuiGraphics graphics, int x, int y, boolean highlighted
     ) {
