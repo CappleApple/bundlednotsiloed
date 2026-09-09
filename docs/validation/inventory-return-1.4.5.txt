@@ -1,0 +1,13 @@
+Client lifecycle assertions: 11 passed
+Initial BNS page acknowledged before leaving inventory
+Settled EMI return unblocks real inventory keyboard and click gate
+Initial BNS page acknowledged before leaving inventory
+Settled EMI return unblocks real inventory keyboard and click gate
+Initial BNS page acknowledged before leaving inventory
+Settled EMI return unblocks real inventory keyboard and click gate
+Initial BNS page acknowledged before leaving inventory
+Settled BNS settings return unblocks real inventory keyboard and click gate
+Initial BNS page acknowledged before leaving inventory
+Settled generic parent-return return unblocks real inventory keyboard and click gate
+Uncancelled inventory key closes to gameplay
+RESULT: PASS

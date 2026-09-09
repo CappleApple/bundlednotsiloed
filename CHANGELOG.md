@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.5 - 2026-09-09
+
+### Fixed
+
+- Returning to the same inventory from recipe viewers or settings now starts its window request correctly, preventing inventory clicks and keys from remaining blocked until sorting or reopening.
+
 ## 1.4.4 - 2026-09-08
 
 ### Added

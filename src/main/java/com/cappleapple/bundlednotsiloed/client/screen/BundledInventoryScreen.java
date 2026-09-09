@@ -101,6 +101,10 @@ public final class BundledInventoryScreen extends InventoryScreen {
         if (!browserStateSent && minecraft.getConnection() != null) {
             com.cappleapple.bundlednotsiloed.client.ClientInventoryWindows.open();
             browserStateSent = true;
+            // Applied page state belongs to the previous session when this screen is restored.
+            // Submit the new session's first page through the normal request/acknowledgement path.
+            windowDirty = true;
+            appliedWindowRevision = -1L;
         }
         ensureInventoryWindow();
     }
