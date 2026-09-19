@@ -1,0 +1,147 @@
+package com.cappleapple.bundlednotsiloed.mixin;
+
+import com.cappleapple.bundlednotsiloed.data.ModAttachments;
+import com.cappleapple.bundlednotsiloed.inventory.ContainerTransfers;
+import com.cappleapple.bundlednotsiloed.inventory.InventoryTransactions;
+import com.cappleapple.bundlednotsiloed.inventory.NewItemDestination;
+import com.cappleapple.bundlednotsiloed.inventory.WorldPickupInsertion;
+import java.util.List;
+import java.util.UUID;
+import net.minecraft.core.NonNullList;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.ContainerInput;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.ItemStack;
+import org.spongepowered.asm.mixin.Final;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+
+/** Routes external Shift-click insertion through identity-aware player storage placement. */
+@Mixin(AbstractContainerMenu.class)
+public abstract class AbstractContainerMenuMixin {
+    @Shadow @Final public NonNullList<Slot> slots;
+    @Unique private UUID sns$quickMovePlayerId;
+    @Unique private List<ItemStack> sns$quickMoveVisibleBefore = List.of();
+    @Unique private boolean sns$quickMoveBackendOnly;
+    @Unique private NewItemDestination sns$quickMoveDestination = NewItemDestination.INVENTORY_FIRST;
+
+    @Inject(method = "moveItemStackTo", at = @At("HEAD"), cancellable = true)
+    private void sns$insertIntoUnifiedPlayerInventory(
+            ItemStack source, int startIndex, int endIndex, boolean reverseDirection,
+            CallbackInfoReturnable<Boolean> callback
+    ) {
+        Inventory playerInventory = sns$storageTarget(startIndex, endIndex);
+        if (playerInventory == null
+                || !playerInventory.player.getData(ModAttachments.PLAYER_DATA).migratedVanillaInventory()
+                || source.isEmpty()) return;
+
+        var inventory = playerInventory.player.getData(ModAttachments.PLAYER_DATA).inventory();
+        if (inventory.ownsReference(source)) {
+            // A player-owned source is an ordinary main-grid/hotbar/equipment move. Let vanilla
+            // honor the exact destination range instead of treating it as external insertion.
+            return;
+        }
+        boolean backendOnly = ContainerTransfers.isBulkBackendRedirect(playerInventory.player);
+        var insertion = backendOnly
+                ? InventoryTransactions.insertIntoBackend(playerInventory.player, source, false)
+                : InventoryTransactions.insertInPlayerTransferOrder(playerInventory.player, source, false);
+        if (!insertion.acceptedAnything()) {
+            callback.setReturnValue(false);
+            return;
+        }
+        source.shrink(insertion.acceptedAmount());
+        callback.setReturnValue(true);
+    }
+
+    /** Preserve menu state and cursor updates without replaying obsolete player-slot projections. */
+    @org.spongepowered.asm.mixin.injection.Redirect(method = {"setItem", "initializeContents"},
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/world/inventory/Slot;set(Lnet/minecraft/world/item/ItemStack;)V"))
+    private void bns$keepAuthoritativePlayerSlots(Slot slot, ItemStack stack) {
+        if (slot.container instanceof net.minecraft.world.entity.player.Inventory inventory
+                && inventory.player.level().isClientSide()
+                && inventory.player.getData(ModAttachments.PLAYER_DATA).migratedVanillaInventory()
+                && slot.getContainerSlot() >= 0 && slot.getContainerSlot() < 36) return;
+        slot.set(stack);
+    }
+
+    /** Covers swap keys as well as menu overrides that bypass Slot.mayPickup. */
+    @Inject(method = "clicked", at = @At("HEAD"), cancellable = true)
+    private void bns$protectOpenBackpack(int slotId, int button, ContainerInput type, Player player, CallbackInfo callback) {
+        if (!player.level().isClientSide() && com.cappleapple.bundlednotsiloed.network.ModNetwork.isInventorySyncBlocked(player)) {
+            callback.cancel();
+            return;
+        }
+        int locked = com.cappleapple.bundlednotsiloed.compat.OpenBackpackGuard.logicalSlot(player);
+        if (locked < 0) return;
+        var window = player.getData(ModAttachments.PLAYER_DATA).inventoryWindow();
+        boolean source = slotId >= 0 && slotId < slots.size() && slots.get(slotId).container == player.getInventory()
+                && slots.get(slotId).getContainerSlot() >= 0 && slots.get(slotId).getContainerSlot() < 36
+                && window.logicalIndex(slots.get(slotId).getContainerSlot()) == locked;
+        boolean swapTarget = type == ContainerInput.SWAP && button >= 0 && button < 9 && button == locked;
+        if (source || swapTarget) callback.cancel();
+    }
+
+    /** Captures custom-menu quick moves which bypass vanilla's moveItemStackTo helper. */
+    @Inject(method = "clicked", at = @At("HEAD"))
+    private void sns$captureExternalQuickMove(int slotId, int button, ContainerInput clickType, Player player,
+                                              CallbackInfo callback) {
+        sns$quickMovePlayerId = null;
+        sns$quickMoveVisibleBefore = List.of();
+        sns$quickMoveDestination = NewItemDestination.INVENTORY_FIRST;
+        if (!(player instanceof ServerPlayer) || clickType != ContainerInput.QUICK_MOVE
+                || slotId < 0 || slotId >= slots.size()
+                || !player.getData(ModAttachments.PLAYER_DATA).migratedVanillaInventory()) return;
+        Slot source = slots.get(slotId);
+        if (source.container == player.getInventory() || !source.hasItem()) return;
+        var data = player.getData(ModAttachments.PLAYER_DATA);
+        sns$quickMovePlayerId = player.getUUID();
+        sns$quickMoveVisibleBefore = data.inventory().visibleCompatibilitySnapshot();
+        sns$quickMoveBackendOnly = ContainerTransfers.isBulkBackendRedirect(player);
+        sns$quickMoveDestination = data.newItemDestination();
+    }
+
+    /** Repositions only what the custom menu added, preserving every pre-existing visible stack. */
+    @Inject(method = "clicked", at = @At("RETURN"))
+    private void sns$finishExternalQuickMove(int slotId, int button, ContainerInput clickType, Player player,
+                                             CallbackInfo callback) {
+        UUID capturedPlayerId = sns$quickMovePlayerId;
+        List<ItemStack> visibleBefore = sns$quickMoveVisibleBefore;
+        boolean backendOnly = sns$quickMoveBackendOnly;
+        NewItemDestination destination = sns$quickMoveDestination;
+        sns$quickMovePlayerId = null;
+        sns$quickMoveVisibleBefore = List.of();
+        sns$quickMoveDestination = NewItemDestination.INVENTORY_FIRST;
+        if (capturedPlayerId == null || !capturedPlayerId.equals(player.getUUID())) return;
+        var inventory = player.getData(ModAttachments.PLAYER_DATA).inventory();
+        boolean relocated = backendOnly
+                ? inventory.relocateReceivedVisibleStacks(visibleBefore, true)
+                : WorldPickupInsertion.relocateReceivedVisibleStacks(inventory, visibleBefore, destination);
+        if (!relocated) return;
+        player.getInventory().setChanged();
+        ((AbstractContainerMenu)(Object)this).broadcastChanges();
+    }
+
+    @Unique
+    private Inventory sns$storageTarget(int startIndex, int endIndex) {
+        if (startIndex < 0 || endIndex > slots.size() || startIndex >= endIndex) return null;
+        Inventory target = null;
+        for (int index = startIndex; index < endIndex; index++) {
+            Slot slot = slots.get(index);
+            if (!(slot.container instanceof Inventory inventory)
+                    || slot.getContainerSlot() < 0
+                    || slot.getContainerSlot() >= Inventory.INVENTORY_SIZE) return null;
+            if (target != null && target != inventory) return null;
+            target = inventory;
+        }
+        return target;
+    }
+
+}
