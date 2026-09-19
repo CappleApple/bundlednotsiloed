@@ -1,0 +1,26 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="CC BY-NC-SA 4.0 with Modpack/Server Exception"
+[[mods]]
+modId="bundlednotsiloed"
+version="${version}"
+displayName="Bundled Not Siloed"
+description="Capacity-based unified player inventory with categories, search and hotbar bindings."
+[[dependencies.bundlednotsiloed]]
+modId="forge"
+mandatory=true
+versionRange="[47.4.23,)"
+ordering="NONE"
+side="BOTH"
+[[dependencies.bundlednotsiloed]]
+modId="minecraft"
+mandatory=true
+versionRange="[1.20.1,1.20.2)"
+ordering="NONE"
+side="BOTH"
+[[dependencies.bundlednotsiloed]]
+modId="stacksnotslots"
+mandatory=true
+versionRange="[1.1,)"
+ordering="AFTER"
+side="BOTH"

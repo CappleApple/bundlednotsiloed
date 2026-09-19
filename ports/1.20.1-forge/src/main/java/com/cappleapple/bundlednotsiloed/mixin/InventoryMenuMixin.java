@@ -1,0 +1,45 @@
+package com.cappleapple.bundlednotsiloed.mixin;
+
+import com.cappleapple.bundlednotsiloed.data.ModAttachments;
+import com.cappleapple.bundlednotsiloed.inventory.PlayerInventoryQuickMove;
+import com.cappleapple.bundlednotsiloed.network.ModNetwork;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.InventoryMenu;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.ItemStack;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+
+/** Gives the open player browser its hotbar-first QUICK_MOVE placement order. */
+@Mixin(InventoryMenu.class)
+public abstract class InventoryMenuMixin {
+    @Inject(method = "quickMoveStack", at = @At("HEAD"), cancellable = true)
+    private void sns$quickMoveVisibleStack(Player player, int menuIndex, CallbackInfoReturnable<ItemStack> callback) {
+        if (!ModNetwork.isBrowserOpen(player)
+                || !com.cappleapple.bundlednotsiloed.data.ModAttachments.get(player).migratedVanillaInventory()) return;
+
+        InventoryMenu menu = (InventoryMenu)(Object)this;
+        if (menuIndex < 0 || menuIndex >= menu.slots.size()) return;
+        Slot sourceSlot = menu.getSlot(menuIndex);
+        int inventorySlot = sourceSlot.getContainerSlot();
+        if (sourceSlot.container != player.getInventory() || inventorySlot < 0 || inventorySlot >= 36 || !sourceSlot.hasItem()) return;
+
+        ItemStack source = sourceSlot.getItem();
+        EquipmentSlot equipmentSlot = player.getEquipmentSlotForItem(source);
+        boolean canAutoEquip = equipmentSlot.getType() == EquipmentSlot.Type.ARMOR
+                && !menu.getSlot(8 - equipmentSlot.getIndex()).hasItem();
+        if (equipmentSlot == EquipmentSlot.OFFHAND && !menu.getSlot(InventoryMenu.SHIELD_SLOT).hasItem()) canAutoEquip = true;
+        if (canAutoEquip) return;
+
+        ItemStack original = source.copy();
+        int logicalSlot = com.cappleapple.bundlednotsiloed.data.ModAttachments.get(player)
+                .inventoryWindow().logicalIndex(inventorySlot);
+        if (!PlayerInventoryQuickMove.move(
+                com.cappleapple.bundlednotsiloed.data.ModAttachments.get(player).inventory(), logicalSlot)) return;
+        menu.broadcastChanges();
+        callback.setReturnValue(original);
+    }
+}

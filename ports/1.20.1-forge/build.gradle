@@ -1,0 +1,70 @@
+plugins {
+ id 'java-library'
+ id 'net.minecraftforge.gradle' version '6.0.42'
+ id 'org.spongepowered.mixin' version '0.7.+'
+}
+version=mod_version
+group=mod_group_id
+base { archivesName = "${mod_id}-${minecraft_version}-forge" }
+java.toolchain.languageVersion=JavaLanguageVersion.of(17)
+minecraft {
+ mappings channel: 'official', version: minecraft_version
+ copyIdeResources=true
+ runs {
+  configureEach {
+   workingDirectory project.file('run')
+   property 'forge.logging.console.level','info'
+   property 'forge.enabledGameTestNamespaces',mod_id
+   mods { "${mod_id}" { source sourceSets.main } }
+  }
+  client {
+   if (project.hasProperty("clientSmoke") || gradle.startParameter.taskNames.any { it.tokenize(":").last() == "runClientSmoke" }) { workingDirectory project.file("run-client-smoke"); property "bundlednotsiloed.clientSmoke", "true" }
+  }
+  server { workingDirectory project.file('run-server-validation'); args '--nogui' }
+  gameTestServer { property 'forge.enabledGameTestNamespaces',mod_id }
+ }
+}
+mixin { add sourceSets.main, 'bundlednotsiloed.refmap.json'; config 'bundlednotsiloed.mixins.json' }
+repositories {
+ mavenCentral()
+ maven { url='https://maven.blamejared.com' }
+ maven { url='https://maven.terraformersmc.com/releases' }
+}
+dependencies {
+ minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+ implementation "com.cappleapple:stacksnotslots:${stacks_not_slots_version}"
+ annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+ compileOnly fg.deobf('mezz.jei:jei-1.20.1-forge-api:15.20.0.106')
+ compileOnly fg.deobf('mezz.jei:jei-1.20.1-common-api:15.20.0.106')
+ compileOnly fg.deobf('dev.emi:emi-forge:1.1.22+1.20.1')
+ testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'
+ testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+tasks.named('processResources') {
+ inputs.property 'version',project.version
+ filesMatching('META-INF/mods.toml') { expand version:project.version }
+}
+tasks.named('jar') { manifest.attributes('MixinConfigs':'bundlednotsiloed.mixins.json'); finalizedBy 'reobfJar' }
+tasks.named('test') { useJUnitPlatform() }
+tasks.withType(JavaCompile).configureEach { options.encoding='UTF-8'; options.compilerArgs.addAll(['-Xmaxerrs','500']) }
+
+
+// Keep development runs on the minimum supported runtime.
+tasks.withType(JavaExec).configureEach { javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(17) } }
+tasks.matching { it.name == "runServer" }.configureEach { standardInput = System.in }
+
+tasks.register("runClientSmoke") { group = "verification"; description = "Start a hidden, muted client and check client mixin loading."; dependsOn "runClient" }
+
+tasks.matching { it.name == "runClient" && (project.hasProperty("clientSmoke") || gradle.startParameter.taskNames.any { it.tokenize(":").last() == "runClientSmoke" }) }.configureEach {
+    doFirst {
+        def options = file("run-client-smoke/options.txt")
+        options.parentFile.mkdirs()
+        def fml = file("run-client-smoke/config/fml.toml")
+        fml.parentFile.mkdirs()
+        fml.text = "earlyWindowControl=false\n"
+        options.text = "soundCategory_master:0.0\npauseOnLostFocus:false\nfullscreen:false\n"
+    }
+}
+
+// Include the project license and its additional modpack/server permission.
+tasks.named('jar') { from('LICENSE') }

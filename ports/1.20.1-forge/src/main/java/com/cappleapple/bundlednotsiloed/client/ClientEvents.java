@@ -1,0 +1,207 @@
+package com.cappleapple.bundlednotsiloed.client;
+
+import com.cappleapple.bundlednotsiloed.config.ClientConfig;
+import com.cappleapple.bundlednotsiloed.client.screen.BundledInventoryScreen;
+import com.cappleapple.bundlednotsiloed.data.ModAttachments;
+import com.cappleapple.bundlednotsiloed.inventory.ExactItemInventoryCount;
+import com.cappleapple.bundlednotsiloed.network.AutoRefillPayload;
+import com.cappleapple.bundlednotsiloed.network.HotbarCyclePayload;
+import com.cappleapple.bundlednotsiloed.network.BulkTransferPayload;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.gui.screens.inventory.InventoryScreen;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
+import net.minecraftforge.client.event.ContainerScreenEvent;
+import net.minecraftforge.client.event.RenderGuiEvent;
+import net.minecraftforge.client.event.ScreenEvent;
+import net.minecraftforge.event.entity.player.ItemTooltipEvent;
+import com.cappleapple.bundlednotsiloed.platform.PacketDistributor;
+
+public final class ClientEvents {
+    private ClientEvents() {}
+
+    @SubscribeEvent
+    public static void appendExactInventoryCount(ItemTooltipEvent event) {
+        if (event.getEntity() == null || event.getItemStack().isEmpty()
+                || !InventoryItemTooltipContext.isPlayerStorageTooltip(
+                        event.getEntity().getInventory(), event.getItemStack())) return;
+        long count = ExactItemInventoryCount.count(
+                com.cappleapple.bundlednotsiloed.data.ModAttachments.get(event.getEntity()).inventory(),
+                event.getItemStack());
+        event.getToolTip().add(Component.translatable(
+                "tooltip.bundlednotsiloed.exact_inventory_count", count).withStyle(ChatFormatting.GRAY));
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void awaitWindowKey(ScreenEvent.KeyPressed.Pre event) {
+        if (ClientInventoryWindows.pending() && !InventorySearchInputCapture.isTyping() && event.getKeyCode() != org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) event.setCanceled(true);
+    }
+
+    @SubscribeEvent
+    public static void playerLoggingIn(ClientPlayerNetworkEvent.LoggingIn event) {
+        ClientSaveState.beginConnection(event.getPlayer());
+    }
+
+    @SubscribeEvent
+    public static void playerLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
+        ClientSaveState.endConnection();
+        ClientInventoryWindows.reset();
+        com.cappleapple.bundlednotsiloed.network.ModNetwork.clearClientSync();
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void replacePlayerInventoryScreen(ScreenEvent.Opening event) {
+        if (event.getNewScreen() == null || event.getNewScreen().getClass() != InventoryScreen.class) return;
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player != null) event.setNewScreen(new BundledInventoryScreen(minecraft.player));
+    }
+
+    @SubscribeEvent
+    public static void closeContainerOverlay(ScreenEvent.Closing event) {
+        ContainerInventoryOverlay.close(event.getScreen());
+    }
+
+    @SubscribeEvent
+    public static void clientTick(TickEvent.ClientTickEvent event) {
+        if (event.phase != TickEvent.Phase.END) return;
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null) return;
+        KeyBindingCompatibility.warnAboutUnsafeExternalBindings(minecraft);
+        while (ClientKeyMappings.CYCLE_FORWARD.consumeClick()) {
+            PacketDistributor.sendToServer(new HotbarCyclePayload(minecraft.player.getInventory().selected, 1));
+        }
+        while (ClientKeyMappings.CYCLE_BACKWARD.consumeClick()) {
+            PacketDistributor.sendToServer(new HotbarCyclePayload(minecraft.player.getInventory().selected, -1));
+        }
+        BulkTransferPayload.Target target = minecraft.screen instanceof AbstractContainerScreen<?>
+                ? BulkTransferPayload.Target.OPEN_MENU : BulkTransferPayload.Target.LOOKED_AT;
+        while (ClientKeyMappings.DUMP_TO_CONTAINER.consumeClick()) {
+            PacketDistributor.sendToServer(new BulkTransferPayload(BulkTransferPayload.Direction.TO_CONTAINER, target));
+        }
+        while (ClientKeyMappings.EXTRACT_FROM_CONTAINER.consumeClick()) {
+            PacketDistributor.sendToServer(new BulkTransferPayload(BulkTransferPayload.Direction.FROM_CONTAINER, target));
+        }
+        while (ClientKeyMappings.TOGGLE_AUTO_REFILL.consumeClick()) {
+            var data = com.cappleapple.bundlednotsiloed.data.ModAttachments.get(minecraft.player);
+            boolean enabled = !data.autoRefill();
+            data.setAutoRefill(enabled);
+            PacketDistributor.sendToServer(new AutoRefillPayload(enabled));
+            minecraft.player.displayClientMessage(Component.translatable(
+                    enabled ? "message.bundlednotsiloed.auto_refill_on" : "message.bundlednotsiloed.auto_refill_off"), true);
+        }
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void renderHud(RenderGuiEvent.Post event) {
+        if (Minecraft.getInstance().screen != null) return;
+        renderCycleOverlay(event.getGuiGraphics());
+        renderTransferOverlay(event.getGuiGraphics());
+    }
+
+    private static void renderCycleOverlay(GuiGraphics graphics) {
+        if (!ClientConfig.HOTBAR_CYCLE_OVERLAY.get()) return;
+        ClientTransientState.CycleOverlay overlay = ClientTransientState.cycleOverlay();
+        if (overlay == null) return;
+        Minecraft minecraft = Minecraft.getInstance();
+        int width = Math.max(minecraft.font.width(overlay.bindingName()), minecraft.font.width(overlay.selected().getHoverName())) + 34;
+        int x = (graphics.guiWidth() - width) / 2;
+        int y = graphics.guiHeight() - 72;
+        graphics.fill(x, y, x + width, y + 34, 0xB0101010);
+        graphics.renderItem(overlay.selected(), x + 5, y + 9);
+        graphics.drawString(minecraft.font, overlay.bindingName(), x + 26, y + 5, 0xAAAAAA, false);
+        graphics.drawString(minecraft.font, overlay.selected().isEmpty() ? Component.translatable("gui.bundlednotsiloed.empty") : overlay.selected().getHoverName(), x + 26, y + 18, 0xFFFFFF, false);
+    }
+
+    private static void renderTransferOverlay(GuiGraphics graphics) {
+        if (!ClientConfig.BULK_TRANSFER_OVERLAY.get()) return;
+        ClientTransientState.TransferOverlay overlay = ClientTransientState.transferOverlay();
+        if (overlay == null || overlay.stacks().isEmpty()) return;
+        Minecraft minecraft = Minecraft.getInstance();
+        int shown = Math.min(24, overlay.stacks().size());
+        int columns = Math.min(6, shown);
+        int rows = com.cappleapple.bundlednotsiloed.platform.LegacyMath.ceilDiv(shown, columns);
+        int boxWidth = columns * 22 + 8;
+        int boxHeight = rows * 22 + 22;
+        int x = (graphics.guiWidth() - boxWidth) / 2;
+        int y = Math.max(8, graphics.guiHeight() / 2 - boxHeight / 2);
+        graphics.fill(x, y, x + boxWidth, y + boxHeight, 0xD0101010);
+        Component title = Component.translatable(overlay.direction() == BulkTransferPayload.Direction.TO_CONTAINER
+                ? "gui.bundlednotsiloed.transferred_to_container" : "gui.bundlednotsiloed.transferred_from_container");
+        graphics.drawCenteredString(minecraft.font, title, x + boxWidth / 2, y + 6, 0xFFFFFF);
+        for (int index = 0; index < shown; index++) {
+            var moved = overlay.stacks().get(index);
+            ItemStack stack = moved.prototype();
+            int cellX = x + 5 + index % columns * 22;
+            int cellY = y + 18 + index / columns * 22;
+            graphics.renderItem(stack, cellX, cellY);
+            long stacks = com.cappleapple.bundlednotsiloed.platform.LegacyMath.ceilDiv(moved.quantity(), Math.max(1, stack.getMaxStackSize()));
+            String count = stacks + "S";
+            graphics.pose().pushPose();
+            graphics.pose().translate(0, 0, 300);
+            graphics.pose().scale(0.5F, 0.5F, 1.0F);
+            graphics.drawString(minecraft.font, count, (cellX + 18) * 2 - minecraft.font.width(count), (cellY + 11) * 2,
+                    0xFFFFFF, true);
+            graphics.pose().popPose();
+        }
+        if (overlay.stacks().size() > shown) {
+            graphics.drawString(minecraft.font, "+" + (overlay.stacks().size() - shown), x + boxWidth - 24, y + 6, 0xAAAAAA, false);
+        }
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void renderContainerOverlay(ContainerScreenEvent.Render.Foreground event) {
+        ContainerInventoryOverlay.render(event);
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void renderContainerTooltips(ScreenEvent.Render.Post event) {
+        ContainerInventoryOverlay.renderTooltip(event);
+        renderCycleOverlay(event.getGuiGraphics());
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void initializeContainerOverlay(ScreenEvent.Init.Post event) {
+        ContainerInventoryOverlay.initialize(event);
+    }
+
+    @SubscribeEvent
+    public static void renderFullInventoryBarriers(ContainerScreenEvent.Render.Foreground event) {
+        InventoryFullFeedback.renderBarrierIcons(event);
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void releaseFullInventoryPlacement(ScreenEvent.MouseButtonReleased.Pre event) {
+        InventoryFullFeedback.playForFailedPlacement(event);
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void keyPlayerInventorySearch(ScreenEvent.KeyPressed.Pre event) {
+        if (event.getScreen() instanceof BundledInventoryScreen screen
+                && screen.captureSearchKeyPressed(event.getKeyCode(), event.getScanCode())) {
+            event.setCanceled(true);
+        }
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void keyContainerOverlay(ScreenEvent.KeyPressed.Pre event) {
+        ContainerInventoryOverlay.keyPressed(event);
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void releaseKeyContainerOverlay(ScreenEvent.KeyReleased.Pre event) {
+        ContainerInventoryOverlay.keyReleased(event);
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void characterContainerOverlay(ScreenEvent.CharacterTyped.Pre event) {
+        ContainerInventoryOverlay.characterTyped(event);
+    }
+
+}

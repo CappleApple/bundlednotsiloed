@@ -1,0 +1,257 @@
+package com.cappleapple.bundlednotsiloed.client;
+
+import com.cappleapple.bundlednotsiloed.BundledNotSiloed;
+import com.cappleapple.bundlednotsiloed.config.ClientConfig;
+import com.cappleapple.bundlednotsiloed.data.PlayerInventoryData;
+import com.cappleapple.bundlednotsiloed.network.PlayerCustomizationPayload;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.UUID;
+import net.minecraft.client.Minecraft;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.TagParser;
+import net.minecraft.world.entity.player.Player;
+import com.cappleapple.bundlednotsiloed.platform.PacketDistributor;
+
+/**
+ * Durable client-owned state stored beside the config directory, where modpack config refreshes
+ * cannot replace player customizations.
+ */
+public final class ClientSaveState {
+    public static final String FILE_NAME = "BNS-SaveState.json";
+    private static final String LEGACY_FILE_NAME = "SNS-SaveState.json";
+    private static final int SCHEMA_VERSION = 1;
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static SaveData data;
+    private static boolean loaded;
+    private static UUID activePlayer;
+    private static boolean activeProfileApplied;
+
+    private ClientSaveState() {}
+
+    public static synchronized void initialize() {
+        if (loaded) return;
+        Path path = savePath();
+        boolean migrated = Files.notExists(path);
+        Path legacyPath = Minecraft.getInstance().gameDirectory.toPath().resolve(LEGACY_FILE_NAME);
+        Path source = migrated && Files.exists(legacyPath) ? legacyPath : path;
+        try {
+            data = Files.exists(source) ? read(source) : new SaveData();
+            normalize();
+        } catch (Exception exception) {
+            BundledNotSiloed.LOGGER.error("Could not load {}; using current client defaults", path, exception);
+            backupMalformedFile(source);
+            data = new SaveData();
+            normalize();
+            migrated = true;
+        }
+        loaded = true;
+        if (migrated) {
+            captureClientSettings();
+            saveNow();
+        } else {
+            applyClientSettings();
+        }
+        BundledNotSiloed.LOGGER.info("Loaded client save state from {}", path);
+    }
+
+    public static synchronized void beginConnection(Player player) {
+        initialize();
+        activePlayer = player.getUUID();
+        activeProfileApplied = false;
+    }
+
+    public static synchronized void endConnection() {
+        activePlayer = null;
+        activeProfileApplied = false;
+    }
+
+    /** Applies the local profile once, then persists every server-validated metadata update. */
+    public static synchronized void receiveMetadata(Player player, PlayerInventoryData inventoryData) {
+        initialize();
+        UUID playerId = player.getUUID();
+        if (!playerId.equals(activePlayer)) {
+            activePlayer = playerId;
+            activeProfileApplied = false;
+        }
+
+        PlayerProfile saved = data.players.get(playerId.toString());
+        if (!activeProfileApplied && saved != null && saved.customization != null && !saved.customization.isBlank()) {
+            try {
+                CompoundTag customization = TagParser.parseTag(saved.customization);
+                inventoryData.loadCustomization(player.level().registryAccess(), customization);
+                activeProfileApplied = true;
+                PacketDistributor.sendToServer(new PlayerCustomizationPayload(customization));
+                return;
+            } catch (Exception exception) {
+                BundledNotSiloed.LOGGER.error("Ignoring invalid saved customization for player {}", playerId, exception);
+                backupMalformedFile(savePath());
+            }
+        }
+
+        activeProfileApplied = true;
+        savePlayerProfile(playerId, inventoryData.saveCustomization(player.level().registryAccess()));
+    }
+
+    public static synchronized void saveClientSettings() {
+        initialize();
+        captureClientSettings();
+        saveNow();
+    }
+
+    public static Path savePath() {
+        return Minecraft.getInstance().gameDirectory.toPath().resolve(FILE_NAME);
+    }
+
+    private static SaveData read(Path path) throws IOException {
+        JsonObject root = JsonParser.parseString(Files.readString(path, StandardCharsets.UTF_8)).getAsJsonObject();
+        int version = root.has("schemaVersion") ? root.get("schemaVersion").getAsInt() : 1;
+        if (version != SCHEMA_VERSION) throw new IllegalArgumentException("Unsupported save-state schema " + version);
+        SaveData result = GSON.fromJson(root, SaveData.class);
+        if (result == null) throw new IllegalArgumentException("Save-state file is empty");
+        return result;
+    }
+
+    private static void normalize() {
+        data.schemaVersion = SCHEMA_VERSION;
+        if (data.settings == null) data.settings = new JsonObject();
+        if (data.players == null) data.players = new LinkedHashMap<>();
+    }
+
+    private static void savePlayerProfile(UUID playerId, CompoundTag customization) {
+        String encoded = customization.toString();
+        PlayerProfile existing = data.players.get(playerId.toString());
+        if (existing != null && encoded.equals(existing.customization)) return;
+        data.players.put(playerId.toString(), new PlayerProfile(encoded));
+        saveNow();
+    }
+
+    private static void captureClientSettings() {
+        JsonObject settings = new JsonObject();
+        put(settings, "capacityDisplayMode", ClientConfig.CAPACITY_DISPLAY_MODE.get().name());
+        put(settings, "pickupLimitNotification", ClientConfig.PICKUP_NOTIFICATION.get().name());
+        put(settings, "enableSearchTooltipIndexing", ClientConfig.TOOLTIP_INDEXING.get());
+        put(settings, "enableHotbarCycleOverlay", ClientConfig.HOTBAR_CYCLE_OVERLAY.get());
+        put(settings, "browserItemCountMode", ClientConfig.ITEM_COUNT_MODE.get().name());
+        put(settings, "browserOverallCountMode", ClientConfig.OVERALL_COUNT_MODE.get().name());
+        put(settings, "manageTabsIcon", ClientConfig.MANAGE_TABS_ICON.get());
+        put(settings, "settingsIcon", ClientConfig.SETTINGS_ICON.get());
+        put(settings, "showBulkTransferOverlay", ClientConfig.BULK_TRANSFER_OVERLAY.get());
+        put(settings, "bulkTransferOverlaySeconds", ClientConfig.BULK_TRANSFER_OVERLAY_SECONDS.get());
+        put(settings, "showFullInventoryBarrierIcons", ClientConfig.FULL_INVENTORY_BARRIER_ICONS.get());
+        put(settings, "inventoryFullSound", ClientConfig.INVENTORY_FULL_SOUND.get());
+        data.settings = settings;
+    }
+
+    private static void applyClientSettings() {
+        JsonObject settings = data.settings;
+        setEnum(settings, "capacityDisplayMode", ClientConfig.CapacityDisplayMode.class, ClientConfig.CAPACITY_DISPLAY_MODE::set);
+        setEnum(settings, "pickupLimitNotification", ClientConfig.PickupNotification.class, ClientConfig.PICKUP_NOTIFICATION::set);
+        setBoolean(settings, "enableSearchTooltipIndexing", ClientConfig.TOOLTIP_INDEXING::set);
+        setBoolean(settings, "enableHotbarCycleOverlay", ClientConfig.HOTBAR_CYCLE_OVERLAY::set);
+        setEnum(settings, "browserItemCountMode", ClientConfig.ItemCountMode.class, ClientConfig.ITEM_COUNT_MODE::set);
+        setEnum(settings, "browserOverallCountMode", ClientConfig.OverallCountMode.class, ClientConfig.OVERALL_COUNT_MODE::set);
+        setString(settings, "manageTabsIcon", ClientConfig.MANAGE_TABS_ICON::set);
+        setString(settings, "settingsIcon", ClientConfig.SETTINGS_ICON::set);
+        setBoolean(settings, "showBulkTransferOverlay", ClientConfig.BULK_TRANSFER_OVERLAY::set);
+        setDouble(settings, "bulkTransferOverlaySeconds", 0.25D, 30.0D, ClientConfig.BULK_TRANSFER_OVERLAY_SECONDS::set);
+        setBoolean(settings, "showFullInventoryBarrierIcons", ClientConfig.FULL_INVENTORY_BARRIER_ICONS::set);
+        setString(settings, "inventoryFullSound", ClientConfig.INVENTORY_FULL_SOUND::set);
+    }
+
+    private static void saveNow() {
+        Path target = savePath();
+        Path temporary = null;
+        try {
+            Files.createDirectories(target.getParent());
+            temporary = Files.createTempFile(target.getParent(), "BNS-SaveState-", ".tmp");
+            Files.writeString(temporary, GSON.toJson(data), StandardCharsets.UTF_8);
+            try {
+                Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (AtomicMoveNotSupportedException ignored) {
+                Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException exception) {
+            BundledNotSiloed.LOGGER.error("Could not save client state to {}", target, exception);
+        } finally {
+            if (temporary != null) {
+                try { Files.deleteIfExists(temporary); }
+                catch (IOException ignored) {}
+            }
+        }
+    }
+
+    private static void backupMalformedFile(Path path) {
+        if (Files.notExists(path)) return;
+        String timestamp = DateTimeFormatter.ISO_INSTANT.format(Instant.now()).replace(':', '-');
+        Path backup = path.resolveSibling("BNS-SaveState.corrupt-" + timestamp + ".json");
+        try { Files.copy(path, backup, StandardCopyOption.REPLACE_EXISTING); }
+        catch (IOException exception) { BundledNotSiloed.LOGGER.error("Could not back up malformed save state {}", path, exception); }
+    }
+
+    private static void put(JsonObject object, String key, String value) { object.addProperty(key, value); }
+    private static void put(JsonObject object, String key, boolean value) { object.addProperty(key, value); }
+    private static void put(JsonObject object, String key, int value) { object.addProperty(key, value); }
+    private static void put(JsonObject object, String key, double value) { object.addProperty(key, value); }
+
+    private static void setString(JsonObject object, String key, java.util.function.Consumer<String> setter) {
+        JsonElement value = object.get(key);
+        if (value != null && value.isJsonPrimitive()) setter.accept(value.getAsString());
+    }
+
+    private static void setBoolean(JsonObject object, String key, java.util.function.Consumer<Boolean> setter) {
+        JsonElement value = object.get(key);
+        if (value == null || !value.isJsonPrimitive()) return;
+        try { setter.accept(value.getAsBoolean()); }
+        catch (RuntimeException exception) { warnInvalid(key, exception); }
+    }
+
+    private static void setInteger(JsonObject object, String key, int minimum, int maximum,
+                                   java.util.function.Consumer<Integer> setter) {
+        JsonElement value = object.get(key);
+        if (value == null || !value.isJsonPrimitive()) return;
+        try { setter.accept(Math.max(minimum, Math.min(maximum, value.getAsInt()))); }
+        catch (RuntimeException exception) { warnInvalid(key, exception); }
+    }
+
+    private static void setDouble(JsonObject object, String key, double minimum, double maximum,
+                                  java.util.function.Consumer<Double> setter) {
+        JsonElement value = object.get(key);
+        if (value == null || !value.isJsonPrimitive()) return;
+        try { setter.accept(Math.max(minimum, Math.min(maximum, value.getAsDouble()))); }
+        catch (RuntimeException exception) { warnInvalid(key, exception); }
+    }
+
+    private static <T extends Enum<T>> void setEnum(JsonObject object, String key, Class<T> type,
+                                                     java.util.function.Consumer<T> setter) {
+        JsonElement value = object.get(key);
+        if (value == null || !value.isJsonPrimitive()) return;
+        try { setter.accept(Enum.valueOf(type, value.getAsString())); }
+        catch (RuntimeException exception) { warnInvalid(key, exception); }
+    }
+
+    private static void warnInvalid(String key, RuntimeException exception) {
+        BundledNotSiloed.LOGGER.warn("Ignoring invalid {} value in {}", key, FILE_NAME, exception);
+    }
+
+    private static final class SaveData {
+        private int schemaVersion = SCHEMA_VERSION;
+        private JsonObject settings = new JsonObject();
+        private Map<String, PlayerProfile> players = new LinkedHashMap<>();
+    }
+
+    private record PlayerProfile(String customization) {}
+}
