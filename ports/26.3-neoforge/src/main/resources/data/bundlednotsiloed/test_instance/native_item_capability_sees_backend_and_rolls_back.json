@@ -1,0 +1,7 @@
+{
+  "type": "minecraft:function",
+  "function": "bundlednotsiloed:native_item_capability_sees_backend_and_rolls_back",
+  "environment": "minecraft:default",
+  "structure": "minecraft:bastion/mobs/empty",
+  "max_ticks": 100
+}

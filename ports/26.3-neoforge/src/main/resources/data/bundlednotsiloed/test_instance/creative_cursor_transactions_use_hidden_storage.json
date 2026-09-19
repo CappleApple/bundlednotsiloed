@@ -1,0 +1,7 @@
+{
+  "type": "minecraft:function",
+  "function": "bundlednotsiloed:creative_cursor_transactions_use_hidden_storage",
+  "environment": "minecraft:default",
+  "structure": "minecraft:bastion/mobs/empty",
+  "max_ticks": 100
+}

@@ -1,0 +1,7 @@
+{
+  "type": "minecraft:function",
+  "function": "bundlednotsiloed:identical_vanilla_writes_keep_live_item_references",
+  "environment": "minecraft:default",
+  "structure": "minecraft:bastion/mobs/empty",
+  "max_ticks": 100
+}

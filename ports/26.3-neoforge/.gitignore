@@ -1,0 +1,7 @@
+*.log
+api-*/
+api-*.txt
+javac.args
+errors.txt
+run-client-smoke/
+run-server-smoke/

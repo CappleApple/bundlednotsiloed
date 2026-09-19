@@ -1,0 +1,7 @@
+{
+  "type": "minecraft:function",
+  "function": "bundlednotsiloed:player_inventory_quick_move_uses_direction_by_source",
+  "environment": "minecraft:default",
+  "structure": "minecraft:bastion/mobs/empty",
+  "max_ticks": 100
+}

@@ -1,39 +1,45 @@
-name: Build
+name: Build 26.3-neoforge
 
-on: [push, pull_request]
+on: [push, pull_request, workflow_dispatch]
+
+permissions:
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
-      - name: Checkout Bundled Not Siloed
+      - name: Check out Bundled Not Siloed
         uses: actions/checkout@v4
         with:
           path: bundled-not-siloed
-          fetch-depth: 0
-          fetch-tags: true
 
-      - name: Checkout Stacks Not Slots
+      - name: Check out matching Stacks Not Slots port
         uses: actions/checkout@v4
         with:
           repository: CappleApple/stacksnotslots
+          ref: cappleapple/26.3-neoforge
           path: stacks-not-slots
 
-      - name: Checkout Panels Not Screens
-        uses: actions/checkout@v4
-        with:
-          repository: CappleApple/panelsnotscreens
-          path: panels-not-screens
-
-      - name: Setup JDK 21
+      - name: Set up Java 25 for Gradle
         uses: actions/setup-java@v4
         with:
-          java-version: '21'
+          java-version: '25'
           distribution: 'temurin'
 
-      - name: Setup Gradle
+      - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build with Gradle
+      - name: Build and test matching projects
         working-directory: bundled-not-siloed
-        run: ./gradlew build -PskipOptionalCompatRuntime
+        run: bash ports/build-port.sh 26.3-neoforge test build runGameTestServer --no-daemon
+
+      - name: Upload production JARs
+        uses: actions/upload-artifact@v4
+        with:
+          name: 26.3-neoforge
+          if-no-files-found: error
+          path: |
+            bundled-not-siloed/ports/26.3-neoforge/build/libs/bundlednotsiloed-26.3-neoforge-1.5.jar
+            stacks-not-slots/ports/26.3-neoforge/build/libs/stacksnotslots-26.3-neoforge-1.1.jar

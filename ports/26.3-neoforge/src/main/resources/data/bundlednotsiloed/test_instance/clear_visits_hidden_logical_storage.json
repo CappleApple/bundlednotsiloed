@@ -1,0 +1,7 @@
+{
+  "type": "minecraft:function",
+  "function": "bundlednotsiloed:clear_visits_hidden_logical_storage",
+  "environment": "minecraft:default",
+  "structure": "minecraft:bastion/mobs/empty",
+  "max_ticks": 100
+}
