@@ -1,0 +1,36 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.cappleapple.bundlednotsiloed.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "mixins": [
+    "AbstractContainerMenuMixin",
+    "AbstractContainerMenuAccessor",
+    "InventoryMixin",
+    "InventoryMenuMixin",
+    "ItemEntityMixin",
+    "PlayerMixin",
+    "RecipeBookAccessor",
+    "SlotMixin",
+    "SophisticatedBackpackContextMixin",
+    "PlayerDataMixin",
+    "FabricInventoryStorageMixin"
+  ],
+  "client": [
+    "AbstractContainerScreenMixin",
+    "CreativeModeInventoryScreenMixin",
+    "KeyMappingMixin",
+    "MouseHandlerMixin",
+    "SlotAccessor",
+    "MultiPlayerGameModeMixin",
+    "ClientPacketListenerMixin",
+    "MinecraftScreenMixin",
+    "KeyboardInputMixin",
+    "ContainerScreenAccessor",
+    "RecipeBookScreenAccessor",
+    "WindowSmokeMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

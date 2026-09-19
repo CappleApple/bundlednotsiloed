@@ -1,5 +1,7 @@
 # Bundled Not Siloed
 
+This branch contains the **Minecraft 26.3 Fabric port** in `ports/26.3-fabric`. See [port build and installation instructions](ports/README.md). The original NeoForge 1.21.1 project remains at the repository root. The remaining sections below document that original project; use the linked port guide for this branch's requirements and integration limits.
+
 Bundled Not Siloed is an inventory overhaul for NeoForge 1.21.1 built on top of **Stacks Not Slots**.
 
 Instead of treating the player's inventory as a hard set of storage slots, BNS gives the player one capacity-limited inventory and keeps the familiar Minecraft grid as the way you interact with it. The normal 27-slot inventory and 9-slot hotbar still exist visually, but storage can extend beyond them when the player has enough capacity.

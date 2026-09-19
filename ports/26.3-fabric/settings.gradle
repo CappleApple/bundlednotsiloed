@@ -1,0 +1,8 @@
+pluginManagement {
+    repositories { maven { url = 'https://maven.fabricmc.net/' }; gradlePluginPortal() }
+}
+plugins { id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0' }
+includeBuild('../../../stacks-not-slots/ports/26.3-fabric') {
+    dependencySubstitution { substitute module('com.cappleapple:stacksnotslots') using project(':') }
+}
+rootProject.name = 'bundlednotsiloed'
