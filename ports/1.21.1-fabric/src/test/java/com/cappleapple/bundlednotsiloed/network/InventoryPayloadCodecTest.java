@@ -1,0 +1,234 @@
+package com.cappleapple.bundlednotsiloed.network;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import io.netty.buffer.Unpooled;
+import java.util.List;
+import java.util.UUID;
+import com.cappleapple.bundlednotsiloed.inventory.ContainerTransfers;
+import com.cappleapple.bundlednotsiloed.inventory.NewItemDestination;
+import net.minecraft.SharedConstants;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.Bootstrap;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+
+class InventoryPayloadCodecTest {
+    @BeforeAll
+    static void bootstrap() {
+        SharedConstants.tryDetectVersion();
+        Bootstrap.bootStrap();
+    }
+
+    @Test
+    void snapshotRoundTripsSparseInventorySlots() {
+        UUID snapshotId = UUID.randomUUID();
+        InventorySnapshotPayload payload = new InventorySnapshotPayload(
+                snapshotId,
+                12L,
+                0,
+                1,
+                List.of(new ItemStack(Items.STONE, 3), ItemStack.EMPTY, new ItemStack(Items.DIRT)));
+
+        RegistryFriendlyByteBuf buffer = createBuffer();
+        try {
+            InventorySnapshotPayload.STREAM_CODEC.encode(buffer, payload);
+            buffer.readerIndex(0);
+            InventorySnapshotPayload decoded = InventorySnapshotPayload.STREAM_CODEC.decode(buffer);
+
+            assertEquals(snapshotId, decoded.snapshotId());
+            assertEquals(12L, decoded.revision());
+            assertEquals(3, decoded.stacks().size());
+            assertSame(Items.STONE, decoded.stacks().get(0).getItem());
+            assertEquals(3, decoded.stacks().get(0).getCount());
+            assertTrue(decoded.stacks().get(1).isEmpty());
+            assertSame(Items.DIRT, decoded.stacks().get(2).getItem());
+        } finally {
+            buffer.release();
+        }
+    }
+
+    @Test
+    void deltaRoundTripsSlotBeingEmptied() {
+        InventoryDeltaPayload payload = new InventoryDeltaPayload(
+                12L,
+                13L,
+                3,
+                List.of(
+                        new InventoryDeltaPayload.SlotChange(1, ItemStack.EMPTY),
+                        new InventoryDeltaPayload.SlotChange(2, new ItemStack(Items.DIRT, 4))));
+
+        RegistryFriendlyByteBuf buffer = createBuffer();
+        try {
+            InventoryDeltaPayload.STREAM_CODEC.encode(buffer, payload);
+            buffer.readerIndex(0);
+            InventoryDeltaPayload decoded = InventoryDeltaPayload.STREAM_CODEC.decode(buffer);
+
+            assertEquals(12L, decoded.baseRevision());
+            assertEquals(13L, decoded.revision());
+            assertEquals(3, decoded.resultingSize());
+            assertEquals(2, decoded.changes().size());
+            assertEquals(1, decoded.changes().get(0).index());
+            assertTrue(decoded.changes().get(0).stack().isEmpty());
+            assertEquals(2, decoded.changes().get(1).index());
+            assertSame(Items.DIRT, decoded.changes().get(1).stack().getItem());
+            assertEquals(4, decoded.changes().get(1).stack().getCount());
+        } finally {
+            buffer.release();
+        }
+    }
+
+    @Test
+    void stowAndInventoryPreferencePayloadsRoundTrip() {
+        RegistryFriendlyByteBuf buffer = createBuffer();
+        try {
+            StowMainGridPayload.STREAM_CODEC.encode(buffer, new StowMainGridPayload());
+            StowSlotPayload.STREAM_CODEC.encode(buffer, new StowSlotPayload(-1));
+            NewItemDestinationPayload.STREAM_CODEC.encode(buffer,
+                    new NewItemDestinationPayload(NewItemDestination.STOWED_FIRST));
+            AutoRefillPayload.STREAM_CODEC.encode(buffer, new AutoRefillPayload(true));
+            ResourceLocation recipeId = ResourceLocation.fromNamespaceAndPath("minecraft", "wooden_pickaxe");
+            RecipeTransferPayload.STREAM_CODEC.encode(buffer, new RecipeTransferPayload(
+                    recipeId, true, com.cappleapple.bundlednotsiloed.compat.RecipeTransferDestination.INVENTORY));
+            buffer.readerIndex(0);
+            assertNotNull(StowMainGridPayload.STREAM_CODEC.decode(buffer));
+            assertEquals(-1, StowSlotPayload.STREAM_CODEC.decode(buffer).slot());
+            assertEquals(NewItemDestination.STOWED_FIRST,
+                    NewItemDestinationPayload.STREAM_CODEC.decode(buffer).destination());
+            assertTrue(AutoRefillPayload.STREAM_CODEC.decode(buffer).enabled());
+            RecipeTransferPayload transfer = RecipeTransferPayload.STREAM_CODEC.decode(buffer);
+            assertEquals(recipeId, transfer.recipeId());
+            assertTrue(transfer.placeAll());
+            assertEquals(com.cappleapple.bundlednotsiloed.compat.RecipeTransferDestination.INVENTORY,
+                    transfer.destination());
+        } finally {
+            buffer.release();
+        }
+    }
+
+    @Test
+    void creativeCursorTransactionsRoundTripFullAndEmptyStacks() {
+        RegistryFriendlyByteBuf buffer = createBuffer();
+        try {
+            CreativeInventoryStowPayload.STREAM_CODEC.encode(
+                    buffer, new CreativeInventoryStowPayload(new ItemStack(Items.STONE, 37)));
+            CreativeInventoryTakePayload.STREAM_CODEC.encode(
+                    buffer, new CreativeInventoryTakePayload(true, new ItemStack(Items.DIAMOND, 12)));
+            CreativeInventoryCursorPayload.STREAM_CODEC.encode(
+                    buffer, new CreativeInventoryCursorPayload(ItemStack.EMPTY));
+            CreativeInventoryCursorPayload.STREAM_CODEC.encode(
+                    buffer, new CreativeInventoryCursorPayload(new ItemStack(Items.DIRT, 5)));
+            buffer.readerIndex(0);
+
+            ItemStack stowed = CreativeInventoryStowPayload.STREAM_CODEC.decode(buffer).carried();
+            assertSame(Items.STONE, stowed.getItem());
+            assertEquals(37, stowed.getCount());
+            CreativeInventoryTakePayload take = CreativeInventoryTakePayload.STREAM_CODEC.decode(buffer);
+            assertTrue(take.takeHalf());
+            assertSame(Items.DIAMOND, take.prototype().getItem());
+            assertEquals(1, take.prototype().getCount());
+            assertTrue(CreativeInventoryCursorPayload.STREAM_CODEC.decode(buffer).carried().isEmpty());
+            ItemStack returned = CreativeInventoryCursorPayload.STREAM_CODEC.decode(buffer).carried();
+            assertSame(Items.DIRT, returned.getItem());
+            assertEquals(5, returned.getCount());
+        } finally {
+            buffer.release();
+        }
+    }
+
+    @Test
+    void browserTransferIdentityRoundTripsWithoutQuantity() {
+        RegistryFriendlyByteBuf buffer = createBuffer();
+        try {
+            BrowserTransferPayload.STREAM_CODEC.encode(buffer, new BrowserTransferPayload(
+                    new ItemStack(Items.DIRT, 32), BrowserTransferPayload.Mode.MAXIMUM));
+            buffer.readerIndex(0);
+            BrowserTransferPayload decoded = BrowserTransferPayload.STREAM_CODEC.decode(buffer);
+            assertSame(Items.DIRT, decoded.prototype().getItem());
+            assertEquals(1, decoded.prototype().getCount());
+            assertEquals(BrowserTransferPayload.Mode.MAXIMUM, decoded.mode());
+        } finally {
+            buffer.release();
+        }
+    }
+
+    @Test
+    void inventoryWindowRoundTripsOnlyBoundedLogicalReferences() {
+        RegistryFriendlyByteBuf buffer = createBuffer();
+        try {
+            List<Integer> slots = java.util.stream.IntStream.range(42, 69).boxed().toList();
+            var payload = new InventoryWindowPayload(7, 12, 3, true, slots);
+            InventoryWindowPayload.STREAM_CODEC.encode(buffer, payload);
+            assertTrue(buffer.writerIndex() < 160);
+            assertEquals(payload, InventoryWindowPayload.STREAM_CODEC.decode(buffer));
+        } finally { buffer.release(); }
+    }
+
+    @Test
+    void acknowledgementIncludesTheCorrectedMappingAndRequest() {
+        RegistryFriendlyByteBuf buffer = createBuffer();
+        try {
+            var result = new InventoryWindowResultPayload(new InventoryWindowPayload(8, 13, 0, false,
+                    java.util.stream.IntStream.range(9, 36).boxed().toList()), 42);
+            InventoryWindowResultPayload.STREAM_CODEC.encode(buffer, result);
+            assertEquals(result, InventoryWindowResultPayload.STREAM_CODEC.decode(buffer));
+        } finally { buffer.release(); }
+    }
+
+    @Test
+    void browserStateAndBulkTransfersRoundTrip() {
+        RegistryFriendlyByteBuf buffer = createBuffer();
+        try {
+            BrowserStatePayload.STREAM_CODEC.encode(buffer, new BrowserStatePayload(true, 7, 0));
+            BulkTransferPayload.STREAM_CODEC.encode(buffer, new BulkTransferPayload(
+                    BulkTransferPayload.Direction.FROM_CONTAINER, BulkTransferPayload.Target.LOOKED_AT));
+            BulkTransferResultPayload.STREAM_CODEC.encode(buffer, new BulkTransferResultPayload(
+                    BulkTransferPayload.Direction.TO_CONTAINER,
+                    List.of(new ContainerTransfers.TransferredStack(new ItemStack(Items.STONE), 130))));
+            buffer.readerIndex(0);
+
+            assertTrue(BrowserStatePayload.STREAM_CODEC.decode(buffer).open());
+            BulkTransferPayload request = BulkTransferPayload.STREAM_CODEC.decode(buffer);
+            assertEquals(BulkTransferPayload.Direction.FROM_CONTAINER, request.direction());
+            assertEquals(BulkTransferPayload.Target.LOOKED_AT, request.target());
+            BulkTransferResultPayload result = BulkTransferResultPayload.STREAM_CODEC.decode(buffer);
+            assertEquals(BulkTransferPayload.Direction.TO_CONTAINER, result.direction());
+            assertSame(Items.STONE, result.stacks().getFirst().prototype().getItem());
+            assertEquals(130, result.stacks().getFirst().quantity());
+        } finally {
+            buffer.release();
+        }
+    }
+
+    @Test
+    void playerCustomizationRoundTripsAsADefensiveNbtCopy() {
+        CompoundTag customization = new CompoundTag();
+        customization.putString("InventorySortPreference", "NAME_ASCENDING");
+        PlayerCustomizationPayload payload = new PlayerCustomizationPayload(customization);
+        customization.putString("InventorySortPreference", "REGISTRY_ID");
+
+        RegistryFriendlyByteBuf buffer = createBuffer();
+        try {
+            PlayerCustomizationPayload.STREAM_CODEC.encode(buffer, payload);
+            buffer.readerIndex(0);
+            PlayerCustomizationPayload decoded = PlayerCustomizationPayload.STREAM_CODEC.decode(buffer);
+            assertEquals("NAME_ASCENDING", decoded.data().getString("InventorySortPreference"));
+        } finally {
+            buffer.release();
+        }
+    }
+
+    private static RegistryFriendlyByteBuf createBuffer() {
+        RegistryAccess.Frozen access = RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY);
+        return new RegistryFriendlyByteBuf(Unpooled.buffer(), access);
+    }
+}

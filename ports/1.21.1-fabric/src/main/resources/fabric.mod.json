@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "id": "bundlednotsiloed",
+  "version": "${version}",
+  "name": "Bundled Not Siloed",
+  "description": "Capacity-based player inventory with searchable categories and a native inventory browser.",
+  "authors": [
+    "CappleApple"
+  ],
+  "license": "CC-BY-NC-SA-4.0",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.cappleapple.bundlednotsiloed.BundledNotSiloed"
+    ],
+    "client": [
+      "com.cappleapple.bundlednotsiloed.client.BundledNotSiloedClient"
+    ],
+    "emi": [
+      "com.cappleapple.bundlednotsiloed.compat.emi.BundledNotSiloedEmiPlugin"
+    ],
+    "fabric-gametest": [
+      "com.cappleapple.bundlednotsiloed.gametest.InventoryCompatibilityGameTests",
+      "com.cappleapple.bundlednotsiloed.gametest.InventoryNetworkGameTests",
+      "com.cappleapple.bundlednotsiloed.gametest.FabricInventoryGameTests"
+    ]
+  },
+  "mixins": [
+    "bundlednotsiloed.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.16.14",
+    "minecraft": "1.21.1",
+    "java": ">=21",
+    "fabric-api": "*",
+    "stacksnotslots": ">=1.1"
+  },
+  "icon": "assets/bundlednotsiloed/textures/gui/bundled-not-siloed-logo.png"
+}
