@@ -1,0 +1,8 @@
+run*/
+logs/
+crash-reports/
+*.log
+*.log.gz
+manual-classes/
+downloads/
+javac*.args
