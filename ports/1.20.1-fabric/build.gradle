@@ -1,0 +1,53 @@
+plugins {
+    id 'fabric-loom' version '1.11.8'
+    id 'maven-publish'
+}
+version = mod_version
+group = 'com.cappleapple'
+base.archivesName = 'bundlednotsiloed-1.20.1-fabric'
+repositories {
+    maven { url = 'https://maven.blamejared.com' }
+    maven { url = 'https://maven.terraformersmc.com/releases' }
+    mavenCentral()
+}
+dependencies {
+    minecraft "com.mojang:minecraft:${minecraft_version}"
+    mappings loom.officialMojangMappings()
+    modImplementation "net.fabricmc:fabric-loader:${loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
+    modImplementation 'com.cappleapple:stacksnotslots:1.1'
+    modCompileOnly 'mezz.jei:jei-1.20.1-fabric-api:15.20.0.106'
+    modCompileOnly 'dev.emi:emi-fabric:1.1.22+1.20.1'
+    implementation include('com.electronwill.night-config:core:3.8.3')
+    implementation include('com.electronwill.night-config:toml:3.8.3')
+    testImplementation 'net.fabricmc:fabric-loader-junit:0.19.5'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+java { toolchain.languageVersion = JavaLanguageVersion.of(17); withSourcesJar() }
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+processResources { inputs.property 'version', project.version; filesMatching('fabric.mod.json') { expand(version: project.version) } }
+test { useJUnitPlatform() }
+loom {
+    runs { client { vmArg '-Dorg.lwjgl.glfw.checkThread0=false' }; server { runDir 'run-server-validation'; programArg '--nogui' } }
+}
+
+loom.runs { gameTestServer { server(); name 'GameTest'; vmArg '-Dfabric-api.gametest'; vmArg '-Dfabric-api.gametest.report-file=build/gametest-results.xml'; runDir 'run-gametest' } }
+
+
+// Keep development runs on the minimum supported runtime.
+tasks.withType(JavaExec).configureEach { javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(17) } }
+tasks.matching { it.name == "runServer" }.configureEach { standardInput = System.in }
+
+loom.runs { clientSmoke { client(); vmArg "-Dbundlednotsiloed.clientSmoke=true"; runDir "run-client-smoke" } }
+
+tasks.matching { it.name == "runClientSmoke" }.configureEach {
+    doFirst {
+        def options = file("run-client-smoke/options.txt")
+        options.parentFile.mkdirs()
+        options.text = "soundCategory_master:0.0\npauseOnLostFocus:false\nfullscreen:false\n"
+    }
+}
+
+// Include the project license and its additional modpack/server permission.
+tasks.named('jar') { from('LICENSE') }

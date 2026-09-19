@@ -1,0 +1,122 @@
+package com.cappleapple.bundlednotsiloed.inventory;
+
+import com.cappleapple.stacksnotslots.api.inventory.DynamicCapacityInventory;
+
+import com.cappleapple.stacksnotslots.api.InsertionRejection;
+import com.cappleapple.stacksnotslots.api.InsertionResult;
+import com.cappleapple.bundlednotsiloed.config.CommonConfig;
+import com.cappleapple.bundlednotsiloed.data.ModAttachments;
+import com.cappleapple.bundlednotsiloed.data.PlayerInventoryData;
+import com.cappleapple.bundlednotsiloed.pickup.PickupLimitCalculator;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+
+public final class InventoryTransactions {
+    private InventoryTransactions() {}
+
+    public static InsertionResult insert(Player player, ItemStack stack, InsertionContext context, boolean simulate) {
+        PlayerInventoryData data = ModAttachments.get(player);
+        DynamicCapacityInventory inventory = data.inventory();
+        if (context == InsertionContext.WORLD_PICKUP && inventory.isOverCapacity()
+                && CommonConfig.OVER_CAPACITY_BLOCKS_PICKUP.getAsBoolean()) {
+            return inventory.insert(stack, simulate);
+        }
+        boolean enforceCategoryLimits = context == InsertionContext.WORLD_PICKUP
+                ? CommonConfig.CATEGORY_LIMITS_WORLD_PICKUP.getAsBoolean()
+                : context == InsertionContext.MANUAL_TRANSFER && CommonConfig.CATEGORY_LIMITS_MANUAL_TRANSFERS.getAsBoolean();
+        int allowed = enforceCategoryLimits
+                ? PickupLimitCalculator.maximumAccepted(inventory, data.categories().categories(), stack, stack.getCount())
+                : stack.getCount();
+        InsertionRejection limitingReason = allowed < stack.getCount() ? InsertionRejection.CATEGORY_LIMIT : InsertionRejection.NONE;
+
+        ItemStack limitedStack = allowed == stack.getCount() ? stack : stack.copyWithCount(allowed);
+        InsertionResult limitedProposal = context == InsertionContext.WORLD_PICKUP
+                ? WorldPickupInsertion.insert(inventory, limitedStack, data.newItemDestination(), true)
+                : inventory.insertAtOrAfter(limitedStack, 0, true);
+        InsertionResult proposed = allowed == stack.getCount() ? limitedProposal : new InsertionResult(
+                stack.getCount(), limitedProposal.acceptedAmount(),
+                stack.copyWithCount(stack.getCount() - limitedProposal.acceptedAmount()),
+                limitedProposal.capacityConsumed(),
+                limitedProposal.acceptedAmount() < allowed ? limitedProposal.rejection() : InsertionRejection.CATEGORY_LIMIT);
+        if (context == InsertionContext.WORLD_PICKUP && !CommonConfig.ALLOW_PARTIAL_PICKUP.getAsBoolean() && !proposed.acceptedAll()) {
+            InsertionRejection rejection = proposed.rejection() == InsertionRejection.NONE
+                    ? InsertionRejection.GLOBAL_CAPACITY
+                    : proposed.rejection();
+            return new InsertionResult(stack.getCount(), 0, stack.copy(), 0, rejection);
+        }
+        if (simulate) return proposed;
+        InsertionResult committed = context == InsertionContext.WORLD_PICKUP
+                ? WorldPickupInsertion.insert(inventory, limitedStack, data.newItemDestination(), false)
+                : inventory.insertAtOrAfter(limitedStack, 0, false);
+        if (allowed == stack.getCount()) return committed;
+        int accepted = committed.acceptedAmount();
+        ItemStack remainder = accepted == stack.getCount() ? ItemStack.EMPTY : stack.copyWithCount(stack.getCount() - accepted);
+        InsertionRejection reason = accepted < allowed ? committed.rejection() : InsertionRejection.CATEGORY_LIMIT;
+        return new InsertionResult(stack.getCount(), accepted, remainder, committed.capacityConsumed(), reason);
+    }
+
+    /** Manual-transfer variant that honors an API-requested synthetic slot instead of compacting/appending. */
+    public static InsertionResult insertIntoSyntheticSlot(Player player, ItemStack stack, int slot, boolean simulate) {
+        PlayerInventoryData data = ModAttachments.get(player);
+        DynamicCapacityInventory inventory = data.inventory();
+        boolean enforceCategoryLimits = CommonConfig.CATEGORY_LIMITS_MANUAL_TRANSFERS.getAsBoolean();
+        int allowed = enforceCategoryLimits
+                ? PickupLimitCalculator.maximumAccepted(inventory, data.categories().categories(), stack, stack.getCount())
+                : stack.getCount();
+        if (allowed <= 0) {
+            return new InsertionResult(stack.getCount(), 0, stack.copy(), 0, InsertionRejection.CATEGORY_LIMIT);
+        }
+        ItemStack limited = allowed == stack.getCount() ? stack : stack.copyWithCount(allowed);
+        InsertionResult result = inventory.insertIntoSyntheticSlot(limited, slot, simulate);
+        int accepted = result.acceptedAmount();
+        ItemStack remainder = accepted == stack.getCount() ? ItemStack.EMPTY : stack.copyWithCount(stack.getCount() - accepted);
+        InsertionRejection reason = accepted < allowed ? result.rejection()
+                : accepted < stack.getCount() ? InsertionRejection.CATEGORY_LIMIT : InsertionRejection.NONE;
+        return new InsertionResult(stack.getCount(), accepted, remainder, result.capacityConsumed(), reason);
+    }
+
+    /** Places a cursor-held stack only in backend slots, never in the visible vanilla window. */
+    public static InsertionResult insertIntoBackend(Player player, ItemStack stack, boolean simulate) {
+        PlayerInventoryData data = ModAttachments.get(player);
+        DynamicCapacityInventory inventory = data.inventory();
+        boolean enforceCategoryLimits = CommonConfig.CATEGORY_LIMITS_MANUAL_TRANSFERS.getAsBoolean();
+        int allowed = enforceCategoryLimits
+                ? PickupLimitCalculator.maximumAccepted(inventory, data.categories().categories(), stack, stack.getCount())
+                : stack.getCount();
+        if (allowed <= 0) {
+            return new InsertionResult(stack.getCount(), 0, stack.copy(), 0, InsertionRejection.CATEGORY_LIMIT);
+        }
+        ItemStack limited = allowed == stack.getCount() ? stack : stack.copyWithCount(allowed);
+        InsertionResult result = inventory.insertAtOrAfter(limited, 36, simulate);
+        int accepted = result.acceptedAmount();
+        ItemStack remainder = accepted == stack.getCount() ? ItemStack.EMPTY : stack.copyWithCount(stack.getCount() - accepted);
+        InsertionRejection reason = accepted < allowed ? result.rejection()
+                : accepted < stack.getCount() ? InsertionRejection.CATEGORY_LIMIT : InsertionRejection.NONE;
+        return new InsertionResult(stack.getCount(), accepted, remainder, result.capacityConsumed(), reason);
+    }
+
+    /**
+     * Manual container transfer which joins an existing identity wherever it already lives. A
+     * brand-new identity follows the player's selected new-item destination and its fallback
+     * order before overflowing into stowed storage.
+     */
+    public static InsertionResult insertInPlayerTransferOrder(Player player, ItemStack stack, boolean simulate) {
+        PlayerInventoryData data = ModAttachments.get(player);
+        DynamicCapacityInventory inventory = data.inventory();
+        boolean enforceCategoryLimits = CommonConfig.CATEGORY_LIMITS_MANUAL_TRANSFERS.getAsBoolean();
+        int allowed = enforceCategoryLimits
+                ? PickupLimitCalculator.maximumAccepted(inventory, data.categories().categories(), stack, stack.getCount())
+                : stack.getCount();
+        if (allowed <= 0) {
+            return new InsertionResult(stack.getCount(), 0, stack.copy(), 0, InsertionRejection.CATEGORY_LIMIT);
+        }
+        ItemStack limited = allowed == stack.getCount() ? stack : stack.copyWithCount(allowed);
+        InsertionResult result = WorldPickupInsertion.insert(
+                inventory, limited, data.newItemDestination(), simulate);
+        int accepted = result.acceptedAmount();
+        ItemStack remainder = accepted == stack.getCount() ? ItemStack.EMPTY : stack.copyWithCount(stack.getCount() - accepted);
+        InsertionRejection reason = accepted < allowed ? result.rejection()
+                : accepted < stack.getCount() ? InsertionRejection.CATEGORY_LIMIT : InsertionRejection.NONE;
+        return new InsertionResult(stack.getCount(), accepted, remainder, result.capacityConsumed(), reason);
+    }
+}
