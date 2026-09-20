@@ -196,7 +196,13 @@ public final class PlayerInventoryData implements INBTSerializable<CompoundTag> 
         } catch (IllegalArgumentException ignored) {
             inventorySortPreference = SortMode.NAME_ASCENDING;
         }
-        selectedCategoryPreference = ResourceLocation.tryParse(root.getString("SelectedCategoryPreference"));
+        String selectedValue = root.getString("SelectedCategoryPreference");
+        selectedCategoryPreference = selectedValue.isBlank() ? null : ResourceLocation.tryParse(selectedValue);
+        // Older saves could encode an absent selection as minecraft:. Ignore stale selections
+        // without discarding the player's categories and other customization.
+        if (selectedCategoryPreference != null && categories.find(selectedCategoryPreference) == null) {
+            selectedCategoryPreference = null;
+        }
         try {
             newItemDestination = NewItemDestination.valueOf(root.getString("NewItemDestination"));
         } catch (IllegalArgumentException ignored) {

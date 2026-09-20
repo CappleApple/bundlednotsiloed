@@ -41,5 +41,5 @@ jobs:
           name: 1.20.1-forge
           if-no-files-found: error
           path: |
-            bundled-not-siloed/ports/1.20.1-forge/build/libs/bundlednotsiloed-1.20.1-forge-1.5.jar
-            stacks-not-slots/ports/1.20.1-forge/build/libs/stacksnotslots-1.20.1-forge-1.1.jar
+            bundled-not-siloed/ports/1.20.1-forge/build/libs/bundlednotsiloed-1.20.1-forge-1.5.1.jar
+            stacks-not-slots/ports/1.20.1-forge/build/libs/stacksnotslots-1.20.1-forge-1.1.1.jar

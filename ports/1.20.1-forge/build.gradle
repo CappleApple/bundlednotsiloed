@@ -3,6 +3,10 @@ plugins {
  id 'net.minecraftforge.gradle' version '6.0.42'
  id 'org.spongepowered.mixin' version '0.7.+'
 }
+def gameplayResume = project.hasProperty('clientGameplayResume')
+def clientAuditOptions = file('run-client-smoke/options.txt')
+def clientAuditFailure = file('run-client-smoke/gameplay-failed.txt')
+def clientAuditPassed = file('run-client-smoke/' + (gameplayResume ? 'BNS_GAMEPLAY_RESUME_PASSED' : 'BNS_GAMEPLAY_PASSED') + '.txt')
 version=mod_version
 group=mod_group_id
 base { archivesName = "${mod_id}-${minecraft_version}-forge" }
@@ -57,14 +61,39 @@ tasks.register("runClientSmoke") { group = "verification"; description = "Start 
 
 tasks.matching { it.name == "runClient" && (project.hasProperty("clientSmoke") || gradle.startParameter.taskNames.any { it.tokenize(":").last() == "runClientSmoke" }) }.configureEach {
     doFirst {
-        def options = file("run-client-smoke/options.txt")
+        def options = clientAuditOptions
         options.parentFile.mkdirs()
         def fml = file("run-client-smoke/config/fml.toml")
         fml.parentFile.mkdirs()
         fml.text = "earlyWindowControl=false\n"
-        options.text = "soundCategory_master:0.0\npauseOnLostFocus:false\nfullscreen:false\n"
+        options.text = "soundCategory_master:0.0\npauseOnLostFocus:false\nfullscreen:false\nrawMouseInput:false\nmaxFps:30\nguiScale:2\nlang:" + (gameplayResume ? "de_de" : "en_us") + "\n"
     }
 }
 
 // Include the project license and its additional modpack/server permission.
 tasks.named('jar') { from('LICENSE') }
+
+// In-world gameplay audit: use a disposable copied world and never capture user input.
+if (project.hasProperty("clientGameplay")) {
+    minecraft.runs.client {
+        property "bundlednotsiloed.clientGameplay", "true"
+        property "bundlednotsiloed.clientGameplayResume", gameplayResume.toString()
+        args "--quickPlaySingleplayer", "BNS-Audit", "--username", "BNSAudit", "--width", "1280", "--height", "720"
+    }
+
+}
+
+if (project.hasProperty('clientGameplay')) {
+    tasks.matching { it.name == 'runClient' }.configureEach {
+        doFirst {
+            clientAuditFailure.delete()
+            clientAuditPassed.delete()
+        }
+        doLast {
+            def passed = clientAuditPassed
+            if (!passed.exists() || clientAuditFailure.exists()) {
+                throw new GradleException('Client gameplay assertions failed; inspect the client log.')
+            }
+        }
+    }
+}

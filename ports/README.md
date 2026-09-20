@@ -2,14 +2,16 @@
 
 Branch: `cappleapple/1.20.1-forge`. This branch contains only the `1.20.1-forge` port. The original NeoForge 1.21.1 implementation remains at the repository root.
 
-- Minecraft 1.20.1; Forge 47.4.23.
+- Minecraft 1.20.1; Forge 47.4.10.
 - Java 17 for the game; Java 17 to run Gradle.
-- Bundled Not Siloed 1.5.
-- Requires Stacks Not Slots 1.1 from [the matching branch](https://github.com/CappleApple/stacksnotslots/tree/cappleapple/1.20.1-forge).
+- Bundled Not Siloed 1.5.1.
+- Requires Stacks Not Slots 1.1.1 from [the matching branch](https://github.com/CappleApple/stacksnotslots/tree/cappleapple/1.20.1-forge).
+
+Forge 47.4.10 is the [recommended build for Minecraft 1.20.1](https://files.minecraftforge.net/net/minecraftforge/forge/index_1.20.1.html).
 
 ## Install
 
-Install `bundlednotsiloed-1.20.1-forge-1.5.jar` and `stacksnotslots-1.20.1-forge-1.1.jar` on the client and server. Use only the pair for this Minecraft version and loader. Fabric additionally requires Fabric API.
+Install `bundlednotsiloed-1.20.1-forge-1.5.1.jar` and `stacksnotslots-1.20.1-forge-1.1.1.jar` on the client and server. Use only the pair for this Minecraft version and loader. Fabric additionally requires Fabric API.
 
 ## Build
 
@@ -31,7 +33,7 @@ The helper builds and tests the matching dependency first. Production JARs are w
 .\ports\1.20.1-forge\gradlew.bat -p ports/1.20.1-forge runGameTestServer
 ```
 
-The target also provides `runClient`, `runServer`, and an opt-in hidden, muted `runClientSmoke` startup gate. CI builds this target, runs unit tests and server GameTests, and uploads the production JAR pair.
+The target also provides `runClient`, `runServer`, and an opt-in hidden, muted `runClientSmoke` startup gate. Use `runClientSmoke -PclientGameplay` for the in-world checks and add `-PclientGameplayResume` for a saved-world rejoin; see [the test-world setup](VALIDATION.md#reproducing-the-client-checks). CI builds this target, runs unit tests and server GameTests, and uploads the production JAR pair.
 
 See [validation results](VALIDATION.md) and [other target branches](BRANCHES.md). Inventory controls and shared configuration behavior are described in the [root README](../README.md); its NeoForge-specific API details describe the original project.
 

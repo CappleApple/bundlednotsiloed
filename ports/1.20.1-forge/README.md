@@ -2,7 +2,7 @@
 
 This standalone port keeps the capacity inventory, categories, search, hotbar bindings, and inventory transfer behavior of the original mod.
 
-Install the `bundlednotsiloed-1.20.1-forge` and matching `stacksnotslots-1.20.1-forge` JARs on both the client and server. Requires Java 17 and Forge 47.4.23 or newer for Minecraft 1.20.1.
+Install the `bundlednotsiloed-1.20.1-forge` and matching `stacksnotslots-1.20.1-forge` JARs on both the client and server. Requires Java 17 and Forge 47.4.10 or newer for Minecraft 1.20.1.
 
 Build from the repository root with `.\ports\build-port.ps1 1.20.1-forge` on Windows or `./ports/build-port.sh 1.20.1-forge` on Linux/macOS. Keep the matching `stacks-not-slots` repository beside this repository; the helper builds its matching source port first. Output JARs are written to `ports/1.20.1-forge/build/libs/`.
 

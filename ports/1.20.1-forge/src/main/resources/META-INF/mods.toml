@@ -11,7 +11,7 @@ description="Capacity-based unified player inventory with categories, search and
 [[dependencies.bundlednotsiloed]]
 modId="forge"
 mandatory=true
-versionRange="[47.4.23,)"
+versionRange="[47.4.10,)"
 ordering="NONE"
 side="BOTH"
 [[dependencies.bundlednotsiloed]]

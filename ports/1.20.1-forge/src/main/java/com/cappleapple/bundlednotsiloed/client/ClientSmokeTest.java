@@ -13,6 +13,7 @@ public final class ClientSmokeTest {
         if (!Boolean.getBoolean("bundlednotsiloed.clientSmoke") || finished) return;
         GLFW.glfwHideWindow(client.getWindow().getWindow());
         client.mouseHandler.releaseMouse();
+        if (Boolean.getBoolean("bundlednotsiloed.clientGameplay")) { ClientGameplayTest.tick(client); return; }
         if (client.getOverlay() != null || client.screen == null) return;
         finished = true;
         try {

@@ -94,7 +94,7 @@ public final class ClientSaveState {
                 CompoundTag customization = TagParser.parseTag(saved.customization);
                 inventoryData.loadCustomization(player.level().registryAccess(), customization);
                 activeProfileApplied = true;
-                PacketDistributor.sendToServer(new PlayerCustomizationPayload(customization));
+                PacketDistributor.sendToServer(new PlayerCustomizationPayload(inventoryData.saveCustomization(player.level().registryAccess())));
                 return;
             } catch (Exception exception) {
                 BundledNotSiloed.LOGGER.error("Ignoring invalid saved customization for player {}", playerId, exception);
