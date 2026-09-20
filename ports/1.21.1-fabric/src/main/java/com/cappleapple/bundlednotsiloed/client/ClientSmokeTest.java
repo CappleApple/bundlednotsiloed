@@ -8,6 +8,7 @@ public final class ClientSmokeTest {
         if (!Boolean.getBoolean("bundlednotsiloed.clientSmoke") || finished) return;
         org.lwjgl.glfw.GLFW.glfwHideWindow(client.getWindow().getWindow());
         client.mouseHandler.releaseMouse();
+        if (Boolean.getBoolean("bundlednotsiloed.clientGameplay")) { ClientGameplayTest.tick(client); return; }
         if (client.getOverlay() != null || client.screen == null) return;
         for (String name : new String[]{
                 "com.cappleapple.bundlednotsiloed.client.screen.BundledInventoryScreen",

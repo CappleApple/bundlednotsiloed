@@ -41,5 +41,5 @@ jobs:
           name: 1.21.1-fabric
           if-no-files-found: error
           path: |
-            bundled-not-siloed/ports/1.21.1-fabric/build/libs/bundlednotsiloed-1.21.1-fabric-1.5.jar
+            bundled-not-siloed/ports/1.21.1-fabric/build/libs/bundlednotsiloed-1.21.1-fabric-1.5.1.jar
             stacks-not-slots/ports/1.21.1-fabric/build/libs/stacksnotslots-1.21.1-fabric-1.1.jar

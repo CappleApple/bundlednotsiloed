@@ -2,6 +2,10 @@ plugins {
     id 'fabric-loom' version '1.11.8'
     id 'maven-publish'
 }
+def gameplayResume = project.hasProperty('clientGameplayResume')
+def clientAuditOptions = file('run-client-smoke/options.txt')
+def clientAuditFailure = file('run-client-smoke/gameplay-failed.txt')
+def clientAuditPassed = file('run-client-smoke/' + (gameplayResume ? 'BNS_GAMEPLAY_RESUME_PASSED' : 'BNS_GAMEPLAY_PASSED') + '.txt')
 version = mod_version
 group = 'com.cappleapple'
 base.archivesName = 'bundlednotsiloed-1.21.1-fabric'
@@ -40,11 +44,36 @@ loom.runs { serverSmoke { server(); programArg '--nogui'; runDir 'run-server-val
 
 tasks.matching { it.name == 'runClientSmoke' }.configureEach {
     doFirst {
-        def options = file('run-client-smoke/options.txt')
+        def options = clientAuditOptions
         options.parentFile.mkdirs()
-        options.text = "soundCategory_master:0.0\npauseOnLostFocus:false\nfullscreen:false\n"
+        options.text = "soundCategory_master:0.0\npauseOnLostFocus:false\nfullscreen:false\nrawMouseInput:false\nmaxFps:30\nguiScale:2\nlang:" + (gameplayResume ? "de_de" : "en_us") + "\n"
     }
 }
 
 // Include the project license and its additional modpack/server permission.
 tasks.named('jar') { from('LICENSE') }
+
+// In-world gameplay audit: use a disposable copied world and never capture user input.
+if (project.hasProperty("clientGameplay")) {
+    loom.runs.clientSmoke {
+        vmArg "-Dbundlednotsiloed.clientGameplay=true"
+        vmArg "-Dbundlednotsiloed.clientGameplayResume=" + gameplayResume
+        programArgs "--quickPlaySingleplayer", "BNS-Audit", "--username", "BNSAudit", "--width", "1280", "--height", "720"
+    }
+
+}
+
+if (project.hasProperty('clientGameplay')) {
+    tasks.named('runClientSmoke').configure {
+        doFirst {
+            clientAuditFailure.delete()
+            clientAuditPassed.delete()
+        }
+        doLast {
+            def passed = clientAuditPassed
+            if (!passed.exists() || clientAuditFailure.exists()) {
+                throw new GradleException('Client gameplay assertions failed; inspect the client log.')
+            }
+        }
+    }
+}
