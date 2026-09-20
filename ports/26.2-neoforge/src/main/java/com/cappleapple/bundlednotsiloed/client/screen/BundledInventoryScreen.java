@@ -447,7 +447,7 @@ public final class BundledInventoryScreen extends InventoryScreen {
             graphics.nextStratum();
             graphics.pose().scale(0.5F, 0.5F);
             graphics.text(font, count,
-                    (x + 17) * 2 - font.width(count), (y + 11) * 2, 0xFFFFFF, true);
+                    (x + 17) * 2 - font.width(count), (y + 11) * 2, 0xFFFFFFFF, true);
             graphics.pose().popMatrix();
         }
         renderScrollbar(graphics, visibleEntryCount());
@@ -528,7 +528,7 @@ public final class BundledInventoryScreen extends InventoryScreen {
                     rowY + SETTINGS_ROW_HEIGHT, 0xFF8B8B8B);
             graphics.item(icons[row], x + 2, rowY + 1);
             String text = font.plainSubstrByWidth(labels[row].getString(), SETTINGS_POPUP_WIDTH - 24);
-            graphics.text(font, text, x + 21, rowY + 5, 0x404040, false);
+            graphics.text(font, text, x + 21, rowY + 5, 0xFF404040, false);
         }
     }
 

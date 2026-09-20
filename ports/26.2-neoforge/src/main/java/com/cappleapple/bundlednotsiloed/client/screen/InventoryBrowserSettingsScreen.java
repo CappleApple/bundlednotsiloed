@@ -121,7 +121,7 @@ public final class InventoryBrowserSettingsScreen extends Screen {
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         super.extractRenderState(graphics, mouseX, mouseY, partialTick);
-        graphics.centeredText(font, title, width / 2, 15, 0xFFFFFF);
+        graphics.centeredText(font, title, width / 2, 15, 0xFFFFFFFF);
     }
 
     private void saveAndClose() {

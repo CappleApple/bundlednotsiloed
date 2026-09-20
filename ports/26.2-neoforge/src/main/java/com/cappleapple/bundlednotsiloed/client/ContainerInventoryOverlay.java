@@ -583,7 +583,7 @@ public final class ContainerInventoryOverlay {
             String text = Minecraft.getInstance().font.plainSubstrByWidth(
                     labels[row].getString(), SETTINGS_POPUP_WIDTH - 24);
             graphics.text(Minecraft.getInstance().font, text,
-                    x + 21, rowY + 5, 0x404040, false);
+                    x + 21, rowY + 5, 0xFF404040, false);
         }
     }
 
@@ -611,7 +611,7 @@ public final class ContainerInventoryOverlay {
             graphics.nextStratum();
             graphics.pose().scale(0.5F, 0.5F);
             graphics.text(minecraft.font, count,
-                    (x + 17) * 2 - minecraft.font.width(count), (y + 11) * 2, 0xFFFFFF, true);
+                    (x + 17) * 2 - minecraft.font.width(count), (y + 11) * 2, 0xFFFFFFFF, true);
             graphics.pose().popMatrix();
         }
         renderScrollbar(graphics, visibleEntryCount());

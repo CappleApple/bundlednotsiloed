@@ -14,6 +14,7 @@ public final class ClientSmokeTest {
         Minecraft client = Minecraft.getInstance();
         org.lwjgl.glfw.GLFW.glfwHideWindow(client.getWindow().handle());
         client.mouseHandler.releaseMouse();
+        if (Boolean.getBoolean("bundlednotsiloed.clientGameplay")) { ClientGameplayTest.tick(client); return; }
         if (client.gui.overlay() != null || client.gui.screen() == null) return;
         for (String name : new String[]{
                 "com.cappleapple.bundlednotsiloed.client.screen.BundledInventoryScreen",

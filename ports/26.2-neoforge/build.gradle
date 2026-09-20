@@ -8,6 +8,10 @@ tasks.named('wrapper', Wrapper).configure {
     distributionType = Wrapper.DistributionType.BIN
 }
 
+def gameplayResume = project.hasProperty('clientGameplayResume')
+def clientAuditOptions = file('run-client-smoke/options.txt')
+def clientAuditFailure = file('run-client-smoke/gameplay-failed.txt')
+def clientAuditPassed = file('run-client-smoke/' + (gameplayResume ? 'BNS_GAMEPLAY_RESUME_PASSED' : 'BNS_GAMEPLAY_PASSED') + '.txt')
 version = mod_version
 group = mod_group_id
 
@@ -139,11 +143,36 @@ idea {
 // Keep the opt-in client gate muted and windowed on a fresh checkout.
 tasks.matching { it.name == 'runClientSmoke' }.configureEach {
     doFirst {
-        def options = file('run-client-smoke/options.txt')
+        def options = clientAuditOptions
         options.parentFile.mkdirs()
-        options.text = "soundCategory_master:0.0\npauseOnLostFocus:false\nfullscreen:false\nrawMouseInput:false\nmaxFps:30\n"
+        options.text = "soundCategory_master:0.0\npauseOnLostFocus:false\nfullscreen:false\nrawMouseInput:false\nmaxFps:30\nguiScale:2\nlang:" + (gameplayResume ? "de_de" : "en_us") + "\n"
     }
 }
 
 // Include the project license and its additional modpack/server permission.
 tasks.named('jar') { from('LICENSE') }
+
+// In-world gameplay audit: use a disposable copied world and never capture user input.
+if (project.hasProperty("clientGameplay")) {
+    neoForge.runs.clientSmoke {
+        systemProperty "bundlednotsiloed.clientGameplay", "true"
+        systemProperty "bundlednotsiloed.clientGameplayResume", gameplayResume.toString()
+        programArguments.addAll "--quickPlaySingleplayer", "BNS-Audit", "--username", "BNSAudit", "--width", "1280", "--height", "720"
+    }
+
+}
+
+if (project.hasProperty('clientGameplay')) {
+    tasks.named('runClientSmoke').configure {
+        doFirst {
+            clientAuditFailure.delete()
+            clientAuditPassed.delete()
+        }
+        doLast {
+            def passed = clientAuditPassed
+            if (!passed.exists() || clientAuditFailure.exists()) {
+                throw new GradleException('Client gameplay assertions failed; inspect the client log.')
+            }
+        }
+    }
+}
