@@ -112,11 +112,11 @@ public final class CategoryEditorScreen extends Screen {
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         super.extractRenderState(graphics, mouseX, mouseY, partialTick);
         int left = width / 2 - PANEL_WIDTH / 2;
-        graphics.centeredText(font, title, width / 2, 15, 0xFFFFFF);
-        graphics.text(font, Component.translatable("gui.bundlednotsiloed.search_results"), left, 98, 0xA0A0A0, false);
+        graphics.centeredText(font, title, width / 2, 15, 0xFFFFFFFF);
+        graphics.text(font, Component.translatable("gui.bundlednotsiloed.search_results"), left, 98, 0xFFA0A0A0, false);
         graphics.text(font, Component.translatable(editMode == EditMode.EXCLUDE
                         ? "gui.bundlednotsiloed.exclude_rules" : "gui.bundlednotsiloed.include_rules"),
-                left + 184, 98, 0xA0A0A0, false);
+                left + 184, 98, 0xFFA0A0A0, false);
 
         int rows = visibleRows();
         for (int row = 0; row < rows; row++) {
@@ -127,7 +127,7 @@ public final class CategoryEditorScreen extends Screen {
             boolean hovered = inside(mouseX, mouseY, left, y, COLUMN_WIDTH, ROW_HEIGHT - 1);
             graphics.fill(left, y, left + COLUMN_WIDTH, y + ROW_HEIGHT - 1, hovered ? 0xA04F72A5 : 0xA0202020);
             graphics.item(CategoryIcons.displayStack(suggestion.rule()), left + 2, y + 1);
-            graphics.text(font, font.plainSubstrByWidth(suggestion.label(), COLUMN_WIDTH - 25), left + 22, y + 6, 0xFFFFFF, false);
+            graphics.text(font, font.plainSubstrByWidth(suggestion.label(), COLUMN_WIDTH - 25), left + 22, y + 6, 0xFFFFFFFF, false);
         }
 
         List<CategoryRule> rules = activeRules();
@@ -147,11 +147,11 @@ public final class CategoryEditorScreen extends Screen {
                 case MOD_ID -> "@" + rule.target().getNamespace();
                 case REGEX -> "/" + rule.expression();
             };
-            graphics.text(font, font.plainSubstrByWidth(label, COLUMN_WIDTH - 39), x + 22, y + 6, 0xFFFFFF, false);
-            graphics.text(font, "×", x + COLUMN_WIDTH - 12, y + 6, 0xFF7777, false);
+            graphics.text(font, font.plainSubstrByWidth(label, COLUMN_WIDTH - 39), x + 22, y + 6, 0xFFFFFFFF, false);
+            graphics.text(font, "×", x + COLUMN_WIDTH - 12, y + 6, 0xFFFF7777, false);
         }
         graphics.text(font, Component.translatable("gui.bundlednotsiloed.rule_counts", includes.size(), excludes.size()),
-                left, height - 67, 0xD0D0D0, false);
+                left, height - 67, 0xFFD0D0D0, false);
     }
 
     @Override
@@ -211,11 +211,11 @@ public final class CategoryEditorScreen extends Screen {
         suggestions.clear();
         suggestionScroll = 0;
         if (raw.isBlank()) {
-            ruleSearch.setTextColor(0xE0E0E0);
+            ruleSearch.setTextColor(0xFFE0E0E0);
             return;
         }
         ItemSearchExpression search = ItemSearchExpression.parse(raw);
-        ruleSearch.setTextColor(search.valid() ? 0xE0E0E0 : 0xFF5555);
+        ruleSearch.setTextColor(search.valid() ? 0xFFE0E0E0 : 0xFFFF5555);
         if (!search.valid()) return;
         if (search.mode() == ItemSearchExpression.Mode.REGEX) {
             CategoryRule rule = CategoryRule.regex(raw);

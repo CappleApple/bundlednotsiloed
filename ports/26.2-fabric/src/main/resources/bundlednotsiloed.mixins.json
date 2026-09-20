@@ -10,7 +10,6 @@
     "InventoryMenuMixin",
     "ItemEntityMixin",
     "PlayerMixin",
-    "RecipeBookAccessor",
     "SlotMixin",
     "SophisticatedBackpackContextMixin",
     "PlayerDataMixin",

@@ -199,7 +199,13 @@ public final class PlayerInventoryData {
         } catch (IllegalArgumentException ignored) {
             inventorySortPreference = SortMode.NAME_ASCENDING;
         }
-        selectedCategoryPreference = Identifier.tryParse(root.getStringOr("SelectedCategoryPreference", ""));
+        String selectedValue = root.getStringOr("SelectedCategoryPreference", "");
+        selectedCategoryPreference = selectedValue.isBlank() ? null : Identifier.tryParse(selectedValue);
+        // Older saves could encode an absent selection as minecraft:. Ignore stale selections
+        // without discarding the player's categories and other customization.
+        if (selectedCategoryPreference != null && categories.find(selectedCategoryPreference) == null) {
+            selectedCategoryPreference = null;
+        }
         try {
             newItemDestination = NewItemDestination.valueOf(root.getStringOr("NewItemDestination", ""));
         } catch (IllegalArgumentException ignored) {

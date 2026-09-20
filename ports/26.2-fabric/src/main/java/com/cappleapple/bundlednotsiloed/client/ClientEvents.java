@@ -97,8 +97,8 @@ public final class ClientEvents {
         int y = graphics.guiHeight() - 72;
         graphics.fill(x, y, x + width, y + 34, 0xB0101010);
         graphics.item(overlay.selected(), x + 5, y + 9);
-        graphics.text(minecraft.font, overlay.bindingName(), x + 26, y + 5, 0xAAAAAA, false);
-        graphics.text(minecraft.font, overlay.selected().isEmpty() ? Component.translatable("gui.bundlednotsiloed.empty") : overlay.selected().getHoverName(), x + 26, y + 18, 0xFFFFFF, false);
+        graphics.text(minecraft.font, overlay.bindingName(), x + 26, y + 5, 0xFFAAAAAA, false);
+        graphics.text(minecraft.font, overlay.selected().isEmpty() ? Component.translatable("gui.bundlednotsiloed.empty") : overlay.selected().getHoverName(), x + 26, y + 18, 0xFFFFFFFF, false);
     }
 
     private static void renderTransferOverlay(GuiGraphicsExtractor graphics) {
@@ -116,7 +116,7 @@ public final class ClientEvents {
         graphics.fill(x, y, x + boxWidth, y + boxHeight, 0xD0101010);
         Component title = Component.translatable(overlay.direction() == BulkTransferPayload.Direction.TO_CONTAINER
                 ? "gui.bundlednotsiloed.transferred_to_container" : "gui.bundlednotsiloed.transferred_from_container");
-        graphics.centeredText(minecraft.font, title, x + boxWidth / 2, y + 6, 0xFFFFFF);
+        graphics.centeredText(minecraft.font, title, x + boxWidth / 2, y + 6, 0xFFFFFFFF);
         for (int index = 0; index < shown; index++) {
             var moved = overlay.stacks().get(index);
             ItemStack stack = moved.prototype();
@@ -129,11 +129,11 @@ public final class ClientEvents {
             graphics.nextStratum();
             graphics.pose().scale(0.5F, 0.5F);
             graphics.text(minecraft.font, count, (cellX + 18) * 2 - minecraft.font.width(count), (cellY + 11) * 2,
-                    0xFFFFFF, true);
+                    0xFFFFFFFF, true);
             graphics.pose().popMatrix();
         }
         if (overlay.stacks().size() > shown) {
-            graphics.text(minecraft.font, "+" + (overlay.stacks().size() - shown), x + boxWidth - 24, y + 6, 0xAAAAAA, false);
+            graphics.text(minecraft.font, "+" + (overlay.stacks().size() - shown), x + boxWidth - 24, y + 6, 0xFFAAAAAA, false);
         }
     }
 

@@ -94,7 +94,7 @@ public final class ClientSaveState {
                 CompoundTag customization = TagParser.parseCompoundFully(saved.customization);
                 inventoryData.loadCustomization(player.registryAccess(), customization);
                 activeProfileApplied = true;
-                com.cappleapple.bundlednotsiloed.platform.PacketDistributor.sendToServer(new PlayerCustomizationPayload(customization));
+                com.cappleapple.bundlednotsiloed.platform.PacketDistributor.sendToServer(new PlayerCustomizationPayload(inventoryData.saveCustomization(player.level().registryAccess())));
                 return;
             } catch (Exception exception) {
                 BundledNotSiloed.LOGGER.error("Ignoring invalid saved customization for player {}", playerId, exception);
