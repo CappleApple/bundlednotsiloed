@@ -41,5 +41,5 @@ jobs:
           name: 26.3-fabric
           if-no-files-found: error
           path: |
-            bundled-not-siloed/ports/26.3-fabric/build/libs/bundlednotsiloed-26.3-fabric-1.5.jar
+            bundled-not-siloed/ports/26.3-fabric/build/libs/bundlednotsiloed-26.3-fabric-1.5.1.jar
             stacks-not-slots/ports/26.3-fabric/build/libs/stacksnotslots-26.3-fabric-1.1.jar

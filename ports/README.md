@@ -4,12 +4,12 @@ Branch: `cappleapple/26.3-fabric`. This branch contains only the `26.3-fabric` p
 
 - Minecraft 26.3; Fabric Loader 0.19.5 / Fabric API 0.161.0+26.3.
 - Java 25 for the game; Java 25 to run Gradle.
-- Bundled Not Siloed 1.5.
+- Bundled Not Siloed 1.5.1.
 - Requires Stacks Not Slots 1.1 from [the matching branch](https://github.com/CappleApple/stacksnotslots/tree/cappleapple/26.3-fabric).
 
 ## Install
 
-Install `bundlednotsiloed-26.3-fabric-1.5.jar` and `stacksnotslots-26.3-fabric-1.1.jar` on the client and server. Use only the pair for this Minecraft version and loader. Fabric additionally requires Fabric API.
+Install `bundlednotsiloed-26.3-fabric-1.5.1.jar` and `stacksnotslots-26.3-fabric-1.1.jar` on the client and server. Use only the pair for this Minecraft version and loader. Fabric additionally requires Fabric API.
 
 ## Build
 
@@ -31,7 +31,7 @@ The helper builds and tests the matching dependency first. Production JARs are w
 .\ports\26.3-fabric\gradlew.bat -p ports/26.3-fabric runGameTestServer
 ```
 
-The target also provides `runClient`, `runServer`, and an opt-in hidden, muted `runClientSmoke` startup gate. CI builds this target, runs unit tests and server GameTests, and uploads the production JAR pair.
+The target also provides `runClient`, `runServer`, and an opt-in hidden, muted `runClientSmoke` startup gate. Use `runClientSmoke -PclientGameplay` for the in-world checks and add `-PclientGameplayResume` for a saved-world rejoin; see [the test-world setup](VALIDATION.md#reproducing-the-client-checks). CI builds this target, runs unit tests and server GameTests, and uploads the production JAR pair.
 
 See [validation results](VALIDATION.md) and [other target branches](BRANCHES.md). Inventory controls and shared configuration behavior are described in the [root README](../README.md); its NeoForge-specific API details describe the original project.
 

@@ -48,7 +48,7 @@ public final class InventorySideRail {
             graphics.fill(textX, top + 2, textX + font.width(shown), top + 11, 0xCC2F5F8F);
         }
         graphics.text(font, shown, textX, top + 2,
-                valid ? 0xFFFFFF : 0xFF5555, false);
+                valid ? 0xFFFFFFFF : 0xFFFF5555, false);
         if (cursorVisible) {
             int cursorX = textX + font.width(shown);
             graphics.fill(cursorX, top + 2, cursorX + 1, top + 11, 0xFFFFFFFF);

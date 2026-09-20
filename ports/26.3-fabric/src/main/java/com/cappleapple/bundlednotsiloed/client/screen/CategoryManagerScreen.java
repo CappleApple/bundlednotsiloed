@@ -28,6 +28,7 @@ public final class CategoryManagerScreen extends Screen {
     private int selectedHotbar = -1;
     private int observedFingerprint;
     private int listBottom;
+    private int listTop;
     private int pickerY;
 
     public CategoryManagerScreen(Screen parent, Player player) {
@@ -46,14 +47,15 @@ public final class CategoryManagerScreen extends Screen {
         iconButtons.clear();
         int left = width / 2 - 150;
         List<CategoryDefinition> categories = categories();
-        listBottom = Math.max(61, height - 124);
-        int visibleRows = Math.max(1, (listBottom - 38) / ROW_HEIGHT);
+        listTop = Math.max(38, 26 + font.split(Component.translatable("gui.bundlednotsiloed.tabs_are_views"), Math.max(1, width - 20)).size() * font.lineHeight + 4);
+        listBottom = Math.max(listTop + ROW_HEIGHT, height - 124);
+        int visibleRows = Math.max(1, (listBottom - listTop) / ROW_HEIGHT);
         categoryScroll = Math.min(categoryScroll, Math.max(0, categories.size() - visibleRows));
 
         for (int row = 0; row < visibleRows && row + categoryScroll < categories.size(); row++) {
             int index = row + categoryScroll;
             CategoryDefinition category = categories.get(index);
-            int y = 38 + row * ROW_HEIGHT;
+            int y = listTop + row * ROW_HEIGHT;
             addRenderableWidget(Button.builder(Component.literal(category.displayName()), ignored ->
                             minecraft.gui.setScreen(new CategoryEditorScreen(this, player, category)))
                     .tooltip(Tooltip.create(Component.translatable("gui.bundlednotsiloed.edit_category_tooltip", category.displayName())))
@@ -122,14 +124,18 @@ public final class CategoryManagerScreen extends Screen {
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         super.extractRenderState(graphics, mouseX, mouseY, partialTick);
-        graphics.centeredText(font, title, width / 2, 15, 0xFFFFFF);
-        graphics.centeredText(font, Component.translatable("gui.bundlednotsiloed.tabs_are_views"), width / 2, 26, 0xA0A0A0);
+        graphics.centeredText(font, title, width / 2, 15, 0xFFFFFFFF);
+        int helpY = 26;
+        for (var line : font.split(Component.translatable("gui.bundlednotsiloed.tabs_are_views"), Math.max(1, width - 20))) {
+            graphics.centeredText(font, line, width / 2, helpY, 0xFFA0A0A0);
+            helpY += font.lineHeight;
+        }
         if (selectedHotbar >= 0) {
             graphics.text(font, Component.translatable("gui.bundlednotsiloed.choose_hotbar_category", selectedHotbar + 1),
-                    width / 2 - 150, pickerY - 11, 0xD0D0D0, false);
+                    width / 2 - 150, pickerY - 11, 0xFFD0D0D0, false);
         } else {
             graphics.text(font, Component.translatable("gui.bundlednotsiloed.choose_hotbar_slot"),
-                    width / 2 - 150, height - 91, 0xD0D0D0, false);
+                    width / 2 - 150, height - 91, 0xFFD0D0D0, false);
         }
         for (Map.Entry<Button, CategoryDefinition> entry : iconButtons.entrySet()) {
             Button button = entry.getKey();
@@ -146,8 +152,8 @@ public final class CategoryManagerScreen extends Screen {
             if (next != bindingScroll) { bindingScroll = next; rebuildButtons(); }
             return true;
         }
-        if (mouseX >= left && mouseX < left + 300 && mouseY >= 38 && mouseY < listBottom) {
-            int visibleRows = Math.max(1, (listBottom - 38) / ROW_HEIGHT);
+        if (mouseX >= left && mouseX < left + 300 && mouseY >= listTop && mouseY < listBottom) {
+            int visibleRows = Math.max(1, (listBottom - listTop) / ROW_HEIGHT);
             int maximum = Math.max(0, categories().size() - visibleRows);
             int next = Math.max(0, Math.min(maximum, categoryScroll - (int)Math.signum(scrollY)));
             if (next != categoryScroll) { categoryScroll = next; rebuildButtons(); }
