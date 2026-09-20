@@ -417,7 +417,7 @@ public final class ContainerInventoryOverlay {
         if (rows.size() != InventoryScreenLayout.GRID_ROWS
                 || rows.stream().anyMatch(y -> cells.stream().filter(cell -> cell.y() == y).count()
                 != InventoryScreenLayout.GRID_COLUMNS)) return null;
-        return new PlayerGrid(List.copyOf(cells), screen.getGuiLeft(), screen.getGuiTop());
+        return new PlayerGrid(List.copyOf(cells), ((com.cappleapple.bundlednotsiloed.mixin.ContainerScreenAccessor)screen).bns$getLeftPos(), ((com.cappleapple.bundlednotsiloed.mixin.ContainerScreenAccessor)screen).bns$getTopPos());
     }
 
     private static boolean supports(AbstractContainerScreen<?> screen) {
@@ -545,8 +545,8 @@ public final class ContainerInventoryOverlay {
         }
         for (Slot slot : activeScreen.getMenu().slots) {
             if (InventoryScreenLayout.inside(mouseX, mouseY,
-                    activeScreen.getGuiLeft() + slot.x - 1,
-                    activeScreen.getGuiTop() + slot.y - 1, 18, 18)) {
+                    ((com.cappleapple.bundlednotsiloed.mixin.ContainerScreenAccessor)activeScreen).bns$getLeftPos() + slot.x - 1,
+                    ((com.cappleapple.bundlednotsiloed.mixin.ContainerScreenAccessor)activeScreen).bns$getTopPos() + slot.y - 1, 18, 18)) {
                 return true;
             }
         }
@@ -583,7 +583,7 @@ public final class ContainerInventoryOverlay {
             String text = Minecraft.getInstance().font.plainSubstrByWidth(
                     labels[row].getString(), SETTINGS_POPUP_WIDTH - 24);
             graphics.text(Minecraft.getInstance().font, text,
-                    x + 21, rowY + 5, 0x404040, false);
+                    x + 21, rowY + 5, 0xFF404040, false);
         }
     }
 
@@ -611,7 +611,7 @@ public final class ContainerInventoryOverlay {
             graphics.nextStratum();
             graphics.pose().scale(0.5F, 0.5F);
             graphics.text(minecraft.font, count,
-                    (x + 17) * 2 - minecraft.font.width(count), (y + 11) * 2, 0xFFFFFF, true);
+                    (x + 17) * 2 - minecraft.font.width(count), (y + 11) * 2, 0xFFFFFFFF, true);
             graphics.pose().popMatrix();
         }
         renderScrollbar(graphics, visibleEntryCount());

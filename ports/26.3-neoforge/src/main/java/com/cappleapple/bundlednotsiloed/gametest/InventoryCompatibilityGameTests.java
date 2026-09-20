@@ -265,6 +265,21 @@ public final class InventoryCompatibilityGameTests {
         helper.assertTrue(inventory.syntheticStack(1).isEmpty()
                         && player.getInventory().getNonEquipmentItems().get(1).isEmpty(),
                 "Aborted insertion must restore both backend and vanilla projection");
+        var bulk = (com.cappleapple.bundlednotsiloed.compat.DynamicPlayerResourceHandler) handler;
+        long beforeBulk = inventory.totalItemCount();
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertTrue(bulk.extractDumpable(stone, 100, transaction) == 4,
+                    "Dump must exclude all twelve hotbar items");
+            helper.assertTrue(bulk.insertBackend(stone, 8, transaction) == 8,
+                    "Collection inserts through backend limits");
+        }
+        helper.assertTrue(inventory.totalItemCount() == beforeBulk && inventory.syntheticStack(0).getCount() == 12,
+                "Aborting a bulk transfer must restore both directions without touching the hotbar");
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertTrue(bulk.extractDumpable(stone, 3, transaction) == 3, "Bulk extraction succeeds");
+            transaction.commit();
+        }
+        helper.assertTrue(inventory.totalItemCount() == beforeBulk - 3, "Committed bulk extraction persists");
         helper.succeed();
     }
 

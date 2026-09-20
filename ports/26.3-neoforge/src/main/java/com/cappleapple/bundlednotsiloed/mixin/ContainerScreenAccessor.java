@@ -5,5 +5,7 @@ import org.spongepowered.asm.mixin.Mutable;
 import org.spongepowered.asm.mixin.gen.Accessor;
 @Mixin(AbstractContainerScreen.class)
 public interface ContainerScreenAccessor {
+    @Accessor("leftPos") int bns$getLeftPos();
+    @Accessor("topPos") int bns$getTopPos();
     @Mutable @Accessor("imageHeight") void bns$setImageHeight(int height);
 }

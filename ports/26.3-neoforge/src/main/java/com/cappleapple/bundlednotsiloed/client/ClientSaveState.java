@@ -94,7 +94,7 @@ public final class ClientSaveState {
                 CompoundTag customization = TagParser.parseCompoundFully(saved.customization);
                 inventoryData.loadCustomization(player.registryAccess(), customization);
                 activeProfileApplied = true;
-                net.neoforged.neoforge.client.network.ClientPacketDistributor.sendToServer(new PlayerCustomizationPayload(customization));
+                net.neoforged.neoforge.client.network.ClientPacketDistributor.sendToServer(new PlayerCustomizationPayload(inventoryData.saveCustomization(player.level().registryAccess())));
                 return;
             } catch (Exception exception) {
                 BundledNotSiloed.LOGGER.error("Ignoring invalid saved customization for player {}", playerId, exception);

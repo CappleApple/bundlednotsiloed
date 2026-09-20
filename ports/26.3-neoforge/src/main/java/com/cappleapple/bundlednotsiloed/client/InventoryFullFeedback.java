@@ -34,7 +34,7 @@ public final class InventoryFullFeedback {
 
         Inventory playerInventory = player.getInventory();
         event.getGuiGraphics().pose().pushMatrix();
-        event.getGuiGraphics().pose().translate(screen.getGuiLeft(), screen.getGuiTop());
+        event.getGuiGraphics().pose().translate(((com.cappleapple.bundlednotsiloed.mixin.ContainerScreenAccessor)screen).bns$getLeftPos(), ((com.cappleapple.bundlednotsiloed.mixin.ContainerScreenAccessor)screen).bns$getTopPos());
         for (Slot slot : screen.getMenu().slots) {
             if (isProjectedPlayerSlot(slot, playerInventory) && slot.isActive() && !slot.hasItem()) {
                 event.getGuiGraphics().fakeItem(new ItemStack(Items.BARRIER), slot.x, slot.y, slot.index);
@@ -81,8 +81,8 @@ public final class InventoryFullFeedback {
 
     private static Slot playerSlotAt(AbstractContainerScreen<?> screen, Inventory inventory,
                                      double mouseX, double mouseY) {
-        double localX = mouseX - screen.getGuiLeft();
-        double localY = mouseY - screen.getGuiTop();
+        double localX = mouseX - ((com.cappleapple.bundlednotsiloed.mixin.ContainerScreenAccessor)screen).bns$getLeftPos();
+        double localY = mouseY - ((com.cappleapple.bundlednotsiloed.mixin.ContainerScreenAccessor)screen).bns$getTopPos();
         for (Slot slot : screen.getMenu().slots) {
             if (isProjectedPlayerSlot(slot, inventory) && slot.isActive()
                     && localX >= slot.x - 1 && localX < slot.x + 17

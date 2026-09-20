@@ -41,5 +41,5 @@ jobs:
           name: 26.3-neoforge
           if-no-files-found: error
           path: |
-            bundled-not-siloed/ports/26.3-neoforge/build/libs/bundlednotsiloed-26.3-neoforge-1.5.jar
-            stacks-not-slots/ports/26.3-neoforge/build/libs/stacksnotslots-26.3-neoforge-1.1.jar
+            bundled-not-siloed/ports/26.3-neoforge/build/libs/bundlednotsiloed-26.3-neoforge-1.5.1.jar
+            stacks-not-slots/ports/26.3-neoforge/build/libs/stacksnotslots-26.3-neoforge-1.1.1.jar

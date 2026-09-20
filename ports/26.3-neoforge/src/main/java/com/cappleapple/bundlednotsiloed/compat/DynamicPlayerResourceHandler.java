@@ -41,6 +41,30 @@ public final class DynamicPlayerResourceHandler extends SnapshotJournal<Inventor
         player.getData(ModAttachments.PLAYER_DATA).syncVanillaCompatibilityView();
         return extractedAmount;
     }
+    /** Bulk collection keeps incoming items in the backend and observes manual-transfer limits. */
+    public int insertBackend(ItemResource resource, int amount, TransactionContext transaction) {
+        TransferPreconditions.checkNonEmptyNonNegative(resource, amount);
+        if (amount == 0) return 0;
+        var stack = resource.toStack(amount);
+        int accepted = InventoryTransactions.insertIntoBackend(player, stack, true).acceptedAmount();
+        if (accepted == 0) return 0;
+        updateSnapshots(transaction);
+        int inserted = inventory.withDeferredNotifications(() -> InventoryTransactions.insertIntoBackend(player, stack, false).acceptedAmount());
+        player.getData(ModAttachments.PLAYER_DATA).syncVanillaCompatibilityView();
+        return inserted;
+    }
+    /** Bulk dumping excludes the hotbar and participates in the container's transaction. */
+    public int extractDumpable(ItemResource resource, int amount, TransactionContext transaction) {
+        TransferPreconditions.checkNonEmptyNonNegative(resource, amount);
+        if (amount == 0) return 0;
+        var stack = resource.toStack();
+        int available = inventory.extractAtOrAfter(stack, amount, 9, true).extractedAmount();
+        if (available == 0) return 0;
+        updateSnapshots(transaction);
+        int extracted = inventory.withDeferredNotifications(() -> inventory.extractAtOrAfter(stack, amount, 9, false).extractedAmount());
+        player.getData(ModAttachments.PLAYER_DATA).syncVanillaCompatibilityView();
+        return extracted;
+    }
     protected InventorySnapshot createSnapshot() { return inventory.snapshot(); }
     protected void revertToSnapshot(InventorySnapshot snapshot) {
         inventory.applySnapshot(snapshot);

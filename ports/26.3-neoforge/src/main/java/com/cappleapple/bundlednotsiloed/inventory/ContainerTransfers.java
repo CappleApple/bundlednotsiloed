@@ -16,8 +16,11 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.neoforged.neoforge.capabilities.Capabilities;
-import net.neoforged.neoforge.items.IItemHandler;
-import net.neoforged.neoforge.items.ItemHandlerHelper;
+import net.neoforged.neoforge.transfer.ResourceHandler;
+import net.neoforged.neoforge.transfer.ResourceHandlerUtil;
+import net.neoforged.neoforge.transfer.item.ItemResource;
+import net.neoforged.neoforge.transfer.transaction.Transaction;
+import com.cappleapple.bundlednotsiloed.compat.DynamicPlayerResourceHandler;
 
 /** Server-authoritative bulk and browser transfers through native menu or item-handler semantics. */
 public final class ContainerTransfers {
@@ -165,18 +168,22 @@ public final class ContainerTransfers {
     }
 
     private static List<TransferredStack> movePlayerToLookedAt(ServerPlayer player) {
-        IItemHandler handler = lookedAtHandler(player);
+        ResourceHandler<ItemResource> handler = lookedAtHandler(player);
         if (handler == null) return List.of();
         DynamicCapacityInventory inventory = player.getData(ModAttachments.PLAYER_DATA).inventory();
         TransferAccumulator moved = new TransferAccumulator();
         for (ItemStack owned : dumpableStacks(inventory)) {
             if (com.cappleapple.bundlednotsiloed.compat.OpenBackpackGuard.protects(player, owned)) continue;
             if (owned.isEmpty()) continue;
-            ItemStack remainder = ItemHandlerHelper.insertItemStacked(handler, owned.copy(), false);
-            int accepted = owned.getCount() - remainder.getCount();
-            if (accepted <= 0) continue;
-            extractDumpedStack(inventory, owned, accepted);
-            moved.add(owned, accepted);
+            try (Transaction transaction = Transaction.openRoot()) {
+                ItemResource resource = ItemResource.of(owned);
+                int accepted = ResourceHandlerUtil.insertStacking(handler, resource, owned.getCount(), transaction);
+                if (accepted <= 0) continue;
+                int extracted = new DynamicPlayerResourceHandler(player).extractDumpable(resource, accepted, transaction);
+                if (extracted != accepted) continue;
+                transaction.commit();
+                moved.add(owned, accepted);
+            }
         }
         return moved.values();
     }
@@ -196,37 +203,38 @@ public final class ContainerTransfers {
     }
 
     private static List<TransferredStack> moveLookedAtToPlayer(ServerPlayer player) {
-        IItemHandler handler = lookedAtHandler(player);
+        ResourceHandler<ItemResource> handler = lookedAtHandler(player);
         if (handler == null) return List.of();
         TransferAccumulator moved = new TransferAccumulator();
         int operations = 0;
-        for (int slot = 0; slot < handler.getSlots() && operations < MAX_WORLD_STACK_OPERATIONS; slot++) {
+        DynamicPlayerResourceHandler destination = new DynamicPlayerResourceHandler(player);
+        for (int slot = 0; slot < handler.size() && operations < MAX_WORLD_STACK_OPERATIONS; slot++) {
             while (operations++ < MAX_WORLD_STACK_OPERATIONS) {
-                ItemStack available = handler.extractItem(slot, Integer.MAX_VALUE, true);
-                if (available.isEmpty()) break;
-                var proposal = InventoryTransactions.insertIntoBackend(player, available, true);
-                int accepted = proposal.acceptedAmount();
-                if (accepted <= 0) return moved.values();
-                ItemStack extracted = handler.extractItem(slot, accepted, false);
-                if (extracted.isEmpty()) break;
-                var insertion = InventoryTransactions.insertIntoBackend(player, extracted, false);
-                if (insertion.acceptedAmount() > 0) moved.add(extracted, insertion.acceptedAmount());
-                if (insertion.acceptedAmount() < extracted.getCount()) {
-                    ItemStack remainder = extracted.copyWithCount(extracted.getCount() - insertion.acceptedAmount());
-                    ItemHandlerHelper.insertItemStacked(handler, remainder, false);
-                    return moved.values();
+                ItemResource resource = handler.getResource(slot);
+                if (resource.isEmpty()) break;
+                try (Transaction transaction = Transaction.openRoot()) {
+                    int available;
+                    try (Transaction simulation = Transaction.open(transaction)) {
+                        available = handler.extract(slot, resource, Integer.MAX_VALUE, simulation);
+                    }
+                    if (available <= 0) break;
+                    int accepted = destination.insertBackend(resource, available, transaction);
+                    if (accepted <= 0) return moved.values();
+                    if (handler.extract(slot, resource, accepted, transaction) != accepted) return moved.values();
+                    transaction.commit();
+                    moved.add(resource.toStack(), accepted);
                 }
             }
         }
         return moved.values();
     }
 
-    private static IItemHandler lookedAtHandler(ServerPlayer player) {
+    private static ResourceHandler<ItemResource> lookedAtHandler(ServerPlayer player) {
         HitResult hit = player.pick(player.blockInteractionRange(), 0.0F, false);
         if (!(hit instanceof BlockHitResult blockHit) || hit.getType() != HitResult.Type.BLOCK) return null;
         if (!player.mayInteract(player.level(), blockHit.getBlockPos())) return null;
         var handler = player.level().getCapability(Capabilities.Item.BLOCK, blockHit.getBlockPos(), blockHit.getDirection());
-        return handler == null ? null : net.neoforged.neoforge.items.IItemHandler.of(handler);
+        return handler;
     }
 
     private static void moveThroughRanges(AbstractContainerMenu menu, ItemStack moving, List<Range> ranges) {
