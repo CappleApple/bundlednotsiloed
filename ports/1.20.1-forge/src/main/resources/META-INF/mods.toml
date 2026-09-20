@@ -5,6 +5,8 @@ license="CC BY-NC-SA 4.0 with Modpack/Server Exception"
 modId="bundlednotsiloed"
 version="${version}"
 displayName="Bundled Not Siloed"
+logoFile="assets/bundlednotsiloed/textures/gui/bundled-not-siloed-logo.png"
+logoBlur=false
 description="Capacity-based unified player inventory with categories, search and hotbar bindings."
 [[dependencies.bundlednotsiloed]]
 modId="forge"
