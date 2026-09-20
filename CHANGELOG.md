@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.6 - 2026-09-20
+
+### Fixed
+
+- Preserve saved custom tabs when the selected tab is absent or no longer exists.
+- Wrap tab-manager help text to fit the window.
+
 ## 1.4.5 - 2026-09-09
 
 ### Fixed

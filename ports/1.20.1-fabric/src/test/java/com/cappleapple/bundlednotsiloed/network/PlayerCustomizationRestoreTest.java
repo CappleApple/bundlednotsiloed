@@ -65,4 +65,17 @@ class PlayerCustomizationRestoreTest {
         assertEquals(Items.APPLE, joined.inventory().syntheticStack(10).getItem());
         assertEquals(Items.COBBLESTONE, joined.inventory().syntheticStack(36).getItem());
     }
+    @Test
+    void absentAndStaleSelectionsDoNotBecomeInvalidSavedCategoryIds() {
+        RegistryAccess.Frozen access = RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY);
+        for (String selection : new String[]{null, "", "minecraft:", "bundlednotsiloed:removed"}) {
+            PlayerInventoryData data = new PlayerInventoryData(null);
+            var saved = data.saveCustomization(access);
+            if (selection != null) saved.putString("SelectedCategoryPreference", selection);
+            data.loadCustomization(access, saved);
+            org.junit.jupiter.api.Assertions.assertNull(data.selectedCategoryPreference(), "Selection: " + selection);
+            org.junit.jupiter.api.Assertions.assertFalse(data.saveCustomization(access).contains("SelectedCategoryPreference"));
+        }
+    }
+
 }
